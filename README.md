@@ -1,55 +1,66 @@
-# Allay Java Plugin Template
+# 🌾 AllayPlots
 
-Welcome to the java plugin template for allay.
+AllayPlots is an AllayMC-native plot plugin ported from FuturePlots (PowerNukkitX). It provides plot claiming,
+deletion, permissions, and enter/leave handling with EconomyAPI integration.
 
-## Prerequisites
+## ✨ Features
 
-- Java21 or higher.
-- Allay installed.
+- Plot claim, delete, and info queries
+- Trust/deny access control
+- Enter/leave plot events
+- Plot protection for building and interactions
+- EconomyAPI integration for claim/refund pricing
+- Built-in i18n (en_US/zh_CN) and PlaceholderAPI support
 
-## Getting Started
+## 📦 Dependencies
 
-1. **Clone this Repository**
+- EconomyAPI (required)
+- PlaceholderAPI (required)
 
-```bash
-git clone https://github.com/AllayMC/JavaPluginTemplate.git
+## 📜 Commands
+
+- `/plot claim` - Claim the plot you are standing in
+- `/plot auto` - Find and claim the next free plot
+- `/plot delete` - Delete the current plot (owner only)
+- `/plot info` - Show information about the current plot
+- `/plot trust <player>` - Trust a player on your plot
+- `/plot untrust <player>` - Remove a trusted player
+- `/plot deny <player>` - Deny a player on your plot
+- `/plot undeny <player>` - Remove a denied player
+
+## ⚙️ Configuration
+
+Config file is created at `plugins/AllayPlots/config.yml`. The `worlds` section defines plot worlds and sizes:
+
+```yaml
+worlds:
+  plotworld:
+    plot-size: 35
+    road-size: 7
+    ground-y: 64
+    max-plots-per-player: 2
+    claim-price: 100.0
+    sell-refund: 50.0
+    teleport-on-claim: true
+    road-edge-block: minecraft:smooth_stone_slab
+    road-corner-block: minecraft:smooth_stone_slab
 ```
-   
-2. **Navigate to the Cloned Directory**
 
-```bash
-cd JavaPluginTemplate
-```
-   
-3. **Change Plugin Information**
+## 💰 EconomyAPI
 
-- Rename package name from `org.allaymc.javaplugintemplate` to `your.group.name.and.pluginname`
-- Update [build.gradle.kts](build.gradle.kts) and [settings.gradle.kts](settings.gradle.kts)
-- Reload gradle
-   
-4. **Build and Run Your Plugin**
+EconomyAPI is a required dependency. Enable pricing in config:
 
-```bash
-gradlew shadowJar
-```
-   
-This command will produce a `.jar` file in the `build/libs` directory. 
-Copy the `.jar` file to the `plugins` directory of your allay server.
-Start the allay server and check the logs to ensure your plugin loads and operates
-as expected.
-
-5. **Test Your Plugin in Gradle**
-
-```bash
-gradlew runServer
+```yaml
+economy:
+  enabled: true
+  currency: ""
 ```
 
-This command will start an allay server with your plugin loaded.
-Then close allay server by clicking `X` in the dashboard window.
+When enabled, claiming deducts `claim-price` and deleting refunds `sell-refund`.
 
-## Documentation
+## 🌍 I18n
 
-For a deeper dive into the Allay API and its functionalities, please refer to our [documentation](https://docs.allaymc.org) (WIP).
+Translations live under `src/main/resources/assets/lang/` and are loaded by Allay's i18n system.
 
 ## License
 

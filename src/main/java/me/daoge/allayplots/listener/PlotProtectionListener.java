@@ -101,7 +101,7 @@ public final class PlotProtectionListener {
         }
         PlotId id = world.getPlotIdAt(x, z);
         if (id == null) {
-            if (config.protectRoads()) {
+            if (config.settings().protectRoads()) {
                 player.sendMessage(messages.render(player, LangKeys.MESSAGE_BUILD_DENIED));
                 return true;
             }

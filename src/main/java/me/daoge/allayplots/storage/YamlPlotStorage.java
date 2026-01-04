@@ -77,6 +77,18 @@ public final class YamlPlotStorage implements PlotStorage {
                     }
                 }
 
+                if (plot.isClaimed() && plotSection.getBoolean("home", false)) {
+                    plot.setHome(true);
+                }
+
+                ConfigSection flagsSection = plotSection.getSection("flags");
+                for (String flagKey : flagsSection.getKeys(false)) {
+                    String value = flagsSection.getString(flagKey, "");
+                    if (!value.isBlank()) {
+                        plot.setFlagRaw(flagKey, value);
+                    }
+                }
+
                 if (!plot.isDefault()) {
                     plots.put(id, plot);
                 }
@@ -117,6 +129,21 @@ public final class YamlPlotStorage implements PlotStorage {
                 }
                 if (!plot.getDenied().isEmpty()) {
                     plotSection.set("denied", toStringList(plot.getDenied()));
+                }
+                if (plot.isHome()) {
+                    plotSection.set("home", true);
+                }
+                if (!plot.getFlags().isEmpty()) {
+                    ConfigSection flagsSection = new ConfigSection();
+                    for (Map.Entry<String, String> entry : plot.getFlags().entrySet()) {
+                        String value = entry.getValue();
+                        if (value != null && !value.isBlank()) {
+                            flagsSection.set(entry.getKey(), value);
+                        }
+                    }
+                    if (!flagsSection.isEmpty()) {
+                        plotSection.set("flags", flagsSection);
+                    }
                 }
                 plotsSection.set(plot.getId().asString(), plotSection);
             }

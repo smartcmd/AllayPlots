@@ -51,7 +51,7 @@ public final class PlotMovementListener {
             return;
         }
 
-        if (toPlot != null && isDenied(player, toPlot.plot()) && !player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
+        if (toPlot != null && !canEnter(player, toPlot.plot()) && !player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
             event.setCancelled(true);
             sendMessage(player, messages.render(player, LangKeys.MESSAGE_ENTER_DENIED));
             return;
@@ -72,11 +72,11 @@ public final class PlotMovementListener {
         }
     }
 
-    private boolean isDenied(EntityPlayer player, Plot plot) {
+    private boolean canEnter(EntityPlayer player, Plot plot) {
         if (plot == null || !plot.isClaimed()) {
-            return false;
+            return true;
         }
-        return plot.getDenied().contains(player.getUniqueId());
+        return plot.canEnter(player.getUniqueId());
     }
 
     private String renderEnterMessage(EntityPlayer player, PlotWorld world, PlotId plotId, Plot plot) {
@@ -100,7 +100,7 @@ public final class PlotMovementListener {
     }
 
     private void sendMessage(EntityPlayer player, String message) {
-        if (config.useActionBar() && player.getController() != null) {
+        if (config.settings().useActionBar() && player.getController() != null) {
             player.getController().sendActionBar(message);
             return;
         }

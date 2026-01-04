@@ -19,8 +19,17 @@
   "allayplots:message.deny_removed": "&a已取消拒绝 &e%1&a。",
   "allayplots:message.unclaimed_info": "&7未认领",
   "allayplots:message.claimed_info": "&a所有者：&f%1",
+  "allayplots:message.home_not_found": "&c未找到玩家 &e%1 &c的地皮。",
+  "allayplots:message.home_set": "&a已将家设置为 &e(%1, %2) &7(&f%3&7)。",
+  "allayplots:message.home_teleport": "&a已传送到家地皮 &e(%1, %2) &7(&f%3&7)。",
+  "allayplots:message.no_permission": "&c你没有权限执行该操作。",
+  "allayplots:message.flag_list": "&7旗标：&e%1",
+  "allayplots:message.flag_value": "&7旗标 &e%1 &7当前为 &f%2&7。",
+  "allayplots:message.flag_set": "&a已设置旗标 &e%1 &a为 &f%2&a。",
+  "allayplots:message.flag_reset": "&a已将旗标 &e%1 &a重置为默认值 (&f%2&a)。",
+  "allayplots:message.flag_invalid_value": "&c旗标值无效，请使用 true/false, on/off, allow/deny。",
   "allayplots:command.plot.description": "地皮管理命令",
-  "allayplots:command.plot.help": "&7命令：&eclaim&7, &eauto&7, &edelete&7, &einfo&7, &etrust&7, &euntrust&7, &edeny&7, &eundeny",
+  "allayplots:command.plot.help": "&7命令：&eclaim&7, &eauto&7, &edelete&7, &einfo&7, &ehome&7, &esethome&7, &etrust&7, &euntrust&7, &edeny&7, &eundeny&7, &eflag",
   "allayplots:command.plot.info.header": "&6地皮 &e(%1, %2) &7(&f%3&7)",
   "allayplots:command.plot.info.access": "&7信任：&a%1 &8| &7拒绝：&c%2"
 }

@@ -24,6 +24,15 @@ public final class LangKeys {
     public static final String MESSAGE_DENY_REMOVED = "allayplots:message.deny_removed";
     public static final String MESSAGE_UNCLAIMED_INFO = "allayplots:message.unclaimed_info";
     public static final String MESSAGE_CLAIMED_INFO = "allayplots:message.claimed_info";
+    public static final String MESSAGE_HOME_NOT_FOUND = "allayplots:message.home_not_found";
+    public static final String MESSAGE_HOME_SET = "allayplots:message.home_set";
+    public static final String MESSAGE_HOME_TELEPORT = "allayplots:message.home_teleport";
+    public static final String MESSAGE_NO_PERMISSION = "allayplots:message.no_permission";
+    public static final String MESSAGE_FLAG_LIST = "allayplots:message.flag_list";
+    public static final String MESSAGE_FLAG_VALUE = "allayplots:message.flag_value";
+    public static final String MESSAGE_FLAG_SET = "allayplots:message.flag_set";
+    public static final String MESSAGE_FLAG_RESET = "allayplots:message.flag_reset";
+    public static final String MESSAGE_FLAG_INVALID_VALUE = "allayplots:message.flag_invalid_value";
 
     public static final String COMMAND_PLOT_DESCRIPTION = "allayplots:command.plot.description";
     public static final String COMMAND_PLOT_HELP = "allayplots:command.plot.help";

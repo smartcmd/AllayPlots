@@ -1,5 +1,7 @@
 package me.daoge.allayplots.plot;
 
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -9,8 +11,10 @@ public final class Plot {
     private final PlotId id;
     private volatile UUID owner;
     private volatile String ownerName;
+    private volatile boolean home;
     private final Set<UUID> trusted = ConcurrentHashMap.newKeySet();
     private final Set<UUID> denied = ConcurrentHashMap.newKeySet();
+    private final Map<String, String> flags = new ConcurrentHashMap<>();
 
     public Plot(String worldName, PlotId id) {
         this.worldName = worldName;
@@ -30,7 +34,14 @@ public final class Plot {
     }
 
     public void setOwner(UUID owner, String ownerName) {
+        UUID previousOwner = this.owner;
         this.owner = owner;
+        if (!Objects.equals(previousOwner, owner)) {
+            trusted.clear();
+            denied.clear();
+            flags.clear();
+            home = false;
+        }
         if (owner == null) {
             this.ownerName = null;
         } else {
@@ -68,6 +79,51 @@ public final class Plot {
         return denied;
     }
 
+    public boolean isHome() {
+        return home;
+    }
+
+    public void setHome(boolean home) {
+        this.home = home;
+    }
+
+    public Map<String, String> getFlags() {
+        return flags;
+    }
+
+    public boolean getFlag(PlotFlag flag) {
+        String raw = flags.get(flag.getLowerCaseName());
+        Boolean parsed = PlotFlagValue.parseBoolean(raw);
+        return parsed != null ? parsed : flag.defaultValue();
+    }
+
+    public String getFlagRaw(String key) {
+        return flags.get(key);
+    }
+
+    public void setFlagRaw(String key, String value) {
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        if (value == null || value.isBlank()) {
+            flags.remove(key);
+            return;
+        }
+        flags.put(key, value);
+    }
+
+    public void setFlag(PlotFlag flag, boolean value) {
+        if (value == flag.defaultValue()) {
+            flags.remove(flag.getLowerCaseName());
+            return;
+        }
+        flags.put(flag.getLowerCaseName(), value ? "true" : "false");
+    }
+
+    public void removeFlag(String key) {
+        flags.remove(key);
+    }
+
     public boolean addTrusted(UUID playerId) {
         return trusted.add(playerId);
     }
@@ -84,6 +140,16 @@ public final class Plot {
         return denied.remove(playerId);
     }
 
+    public boolean canEnter(UUID playerId) {
+        if (denied.contains(playerId)) {
+            return false;
+        }
+        if (owner == null) {
+            return true;
+        }
+        return owner.equals(playerId) || trusted.contains(playerId) || getFlag(PlotFlag.ENTRY);
+    }
+
     public boolean canBuild(UUID playerId) {
         // Deny list always wins to keep access control predictable.
         if (denied.contains(playerId)) {
@@ -92,10 +158,10 @@ public final class Plot {
         if (owner == null) {
             return false;
         }
-        return owner.equals(playerId) || trusted.contains(playerId);
+        return owner.equals(playerId) || trusted.contains(playerId) || getFlag(PlotFlag.BUILD);
     }
 
     public boolean isDefault() {
-        return owner == null && trusted.isEmpty() && denied.isEmpty();
+        return owner == null && trusted.isEmpty() && denied.isEmpty() && flags.isEmpty() && !home;
     }
 }

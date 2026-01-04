@@ -3,10 +3,13 @@ package me.daoge.allayplots.command;
 import me.daoge.allayplots.Permissions;
 import me.daoge.allayplots.config.PlotWorldConfig;
 import me.daoge.allayplots.config.PluginConfig;
+import me.daoge.allayplots.event.PlotClaimEvent;
 import me.daoge.allayplots.i18n.LangKeys;
 import me.daoge.allayplots.i18n.MessageService;
 import me.daoge.allayplots.plot.Plot;
 import me.daoge.allayplots.plot.PlotId;
+import me.daoge.allayplots.plot.PlotFlag;
+import me.daoge.allayplots.plot.PlotFlagValue;
 import me.daoge.allayplots.plot.PlotService;
 import me.daoge.allayplots.plot.PlotWorld;
 import org.allaymc.api.command.Command;
@@ -15,7 +18,9 @@ import org.allaymc.api.command.SenderType;
 import org.allaymc.api.command.tree.CommandContext;
 import org.allaymc.api.command.tree.CommandTree;
 import org.allaymc.api.entity.interfaces.EntityPlayer;
+import org.allaymc.api.math.location.Location3d;
 import org.allaymc.api.permission.OpPermissionCalculator;
+import org.allaymc.api.server.Server;
 import org.allaymc.economyapi.Account;
 import org.allaymc.economyapi.Currency;
 import org.allaymc.economyapi.EconomyAPI;
@@ -38,7 +43,7 @@ public final class PlotCommand extends Command {
         this.plotService = plotService;
         this.config = config;
         this.messages = messages;
-        this.economyEnabled = config.economyEnabled();
+        this.economyEnabled = config.economy().enabled();
         this.economyApi = EconomyAPI.getAPI();
         this.currency = economyEnabled ? resolveCurrency(logger) : economyApi.getDefaultCurrency();
         aliases.addAll(List.of("plots", "p"));
@@ -47,37 +52,19 @@ public final class PlotCommand extends Command {
 
     @Override
     public void prepareCommandTree(CommandTree tree) {
-        tree.getRoot()
-                .key("help")
-                .exec(this::sendHelp)
-                .root()
-                .key("claim")
-                .exec(this::handleClaim, SenderType.PLAYER)
-                .root()
-                .key("auto")
-                .exec(this::handleAuto, SenderType.PLAYER)
-                .root()
-                .key("delete")
-                .exec(this::handleDelete, SenderType.PLAYER)
-                .root()
-                .key("info")
-                .exec(this::handleInfo, SenderType.PLAYER)
-                .root()
-                .key("trust")
-                .playerTarget("player")
-                .exec(this::handleTrust, SenderType.PLAYER)
-                .root()
-                .key("untrust")
-                .playerTarget("player")
-                .exec(this::handleUntrust, SenderType.PLAYER)
-                .root()
-                .key("deny")
-                .playerTarget("player")
-                .exec(this::handleDeny, SenderType.PLAYER)
-                .root()
-                .key("undeny")
-                .playerTarget("player")
-                .exec(this::handleUndeny, SenderType.PLAYER);
+        var root = tree.getRoot();
+        root.key("help").exec(this::sendHelp);
+        root.key("claim").exec(this::handleClaim, SenderType.PLAYER);
+        root.key("auto").exec(this::handleAuto, SenderType.PLAYER);
+        root.key("delete").exec(this::handleDelete, SenderType.PLAYER);
+        root.key("info").exec(this::handleInfo, SenderType.PLAYER);
+        root.key("home").playerTarget("player").optional().exec(this::handleHomeOther, SenderType.PLAYER);
+        root.key("sethome").exec(this::handleSetHome, SenderType.PLAYER);
+        root.key("trust").playerTarget("player").exec(this::handleTrust, SenderType.PLAYER);
+        root.key("untrust").playerTarget("player").exec(this::handleUntrust, SenderType.PLAYER);
+        root.key("deny").playerTarget("player").exec(this::handleDeny, SenderType.PLAYER);
+        root.key("undeny").playerTarget("player").exec(this::handleUndeny, SenderType.PLAYER);
+        root.key("flag").enumClass("flag", PlotFlag.class).optional().str("value").optional().exec(this::handleFlag, SenderType.PLAYER);
     }
 
     private CommandResult sendHelp(CommandContext context) {
@@ -91,7 +78,7 @@ public final class PlotCommand extends Command {
         if (plotContext == null) {
             return context.fail();
         }
-        return handleClaim(context, player, plotContext);
+        return handleClaim(context, player, plotContext, false);
     }
 
     private CommandResult handleAuto(CommandContext context, EntityPlayer player) {
@@ -102,19 +89,15 @@ public final class PlotCommand extends Command {
         }
         PlotId nextId = plotService.findNextFreePlotId(world);
         PlotContext plotContext = new PlotContext(world, nextId, world.getPlot(nextId));
-        return handleClaim(context, player, plotContext);
+        return handleClaim(context, player, plotContext, true);
     }
 
     private CommandResult handleDelete(CommandContext context, EntityPlayer player) {
-        PlotContext plotContext = resolvePlotContext(context, player);
+        PlotContext plotContext = resolveClaimedPlotContext(context, player);
         if (plotContext == null) {
             return context.fail();
         }
         Plot plot = plotContext.plot();
-        if (plot == null || !plot.isClaimed()) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
-            return context.fail();
-        }
         if (!plot.isOwner(player.getUniqueId()) && !player.hasPermission(Permissions.ADMIN_DELETE).asBoolean()) {
             context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
             return context.fail();
@@ -160,7 +143,25 @@ public final class PlotCommand extends Command {
         return context.success();
     }
 
-    private CommandResult handleTrust(CommandContext context, EntityPlayer player) {
+    private CommandResult handleHomeOther(CommandContext context, EntityPlayer player) {
+        List<EntityPlayer> targets = context.getResult(0);
+        if (targets == null || targets.isEmpty()) {
+            return teleportHome(context, player, player.getUniqueId(), player.getDisplayName());
+        }
+        if (targets.size() > 1) {
+            context.addTooManyTargetsError();
+            return context.fail();
+        }
+        EntityPlayer target = targets.getFirst();
+        if (!target.getUniqueId().equals(player.getUniqueId())
+                && !player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_NO_PERMISSION));
+            return context.fail();
+        }
+        return teleportHome(context, player, target.getUniqueId(), target.getDisplayName());
+    }
+
+    private CommandResult handleSetHome(CommandContext context, EntityPlayer player) {
         PlotContext plotContext = resolvePlotContext(context, player);
         if (plotContext == null) {
             return context.fail();
@@ -169,10 +170,24 @@ public final class PlotCommand extends Command {
         if (plot == null) {
             return context.fail();
         }
-        EntityPlayer target = resolveSingleTarget(context, 0);
-        if (target == null) {
+        plotService.setHomePlot(player.getUniqueId(), plotContext.world(), plotContext.plotId());
+        context.addOutput(messages.render(
+                player,
+                LangKeys.MESSAGE_HOME_SET,
+                plotContext.plotId().x(),
+                plotContext.plotId().z(),
+                plotContext.world().getConfig().worldName()
+        ));
+        return context.success();
+    }
+
+    private CommandResult handleTrust(CommandContext context, EntityPlayer player) {
+        PlotTarget plotTarget = resolveOwnedPlotTarget(context, player);
+        if (plotTarget == null) {
             return context.fail();
         }
+        Plot plot = plotTarget.plot();
+        EntityPlayer target = plotTarget.target();
         plot.addTrusted(target.getUniqueId());
         plot.getDenied().remove(target.getUniqueId());
         context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_ADDED, target.getDisplayName()));
@@ -180,36 +195,24 @@ public final class PlotCommand extends Command {
     }
 
     private CommandResult handleUntrust(CommandContext context, EntityPlayer player) {
-        PlotContext plotContext = resolvePlotContext(context, player);
-        if (plotContext == null) {
+        PlotTarget plotTarget = resolveOwnedPlotTarget(context, player);
+        if (plotTarget == null) {
             return context.fail();
         }
-        Plot plot = requireOwnedPlot(context, player, plotContext);
-        if (plot == null) {
-            return context.fail();
-        }
-        EntityPlayer target = resolveSingleTarget(context, 0);
-        if (target == null) {
-            return context.fail();
-        }
+        Plot plot = plotTarget.plot();
+        EntityPlayer target = plotTarget.target();
         plot.removeTrusted(target.getUniqueId());
         context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_REMOVED, target.getDisplayName()));
         return context.success();
     }
 
     private CommandResult handleDeny(CommandContext context, EntityPlayer player) {
-        PlotContext plotContext = resolvePlotContext(context, player);
-        if (plotContext == null) {
+        PlotTarget plotTarget = resolveOwnedPlotTarget(context, player);
+        if (plotTarget == null) {
             return context.fail();
         }
-        Plot plot = requireOwnedPlot(context, player, plotContext);
-        if (plot == null) {
-            return context.fail();
-        }
-        EntityPlayer target = resolveSingleTarget(context, 0);
-        if (target == null) {
-            return context.fail();
-        }
+        Plot plot = plotTarget.plot();
+        EntityPlayer target = plotTarget.target();
         plot.addDenied(target.getUniqueId());
         plot.getTrusted().remove(target.getUniqueId());
         context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_ADDED, target.getDisplayName()));
@@ -217,6 +220,52 @@ public final class PlotCommand extends Command {
     }
 
     private CommandResult handleUndeny(CommandContext context, EntityPlayer player) {
+        PlotTarget plotTarget = resolveOwnedPlotTarget(context, player);
+        if (plotTarget == null) {
+            return context.fail();
+        }
+        Plot plot = plotTarget.plot();
+        EntityPlayer target = plotTarget.target();
+        plot.removeDenied(target.getUniqueId());
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_REMOVED, target.getDisplayName()));
+        return context.success();
+    }
+
+    private CommandResult handleFlagList(CommandContext context, EntityPlayer player) {
+        PlotContext plotContext = resolveClaimedPlotContext(context, player);
+        if (plotContext == null) {
+            return context.fail();
+        }
+        Plot plot = plotContext.plot();
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_FLAG_LIST, renderFlags(plot)));
+        return context.success();
+    }
+
+    private CommandResult handleFlag(CommandContext context, EntityPlayer player) {
+        PlotFlag flag = context.getResult(0);
+        if (flag == null) {
+            return handleFlagList(context, player);
+        }
+        String rawValue = context.getResult(1);
+        if (rawValue == null || rawValue.isBlank()) {
+            return handleFlagShow(context, player);
+        }
+        return handleFlagSet(context, player);
+    }
+
+    private CommandResult handleFlagShow(CommandContext context, EntityPlayer player) {
+        PlotContext plotContext = resolveClaimedPlotContext(context, player);
+        if (plotContext == null) {
+            return context.fail();
+        }
+        Plot plot = plotContext.plot();
+        PlotFlag flag = context.getResult(0);
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_FLAG_VALUE, flag.getLowerCaseName(),
+                PlotFlagValue.format(plot.getFlag(flag))));
+        return context.success();
+    }
+
+    private CommandResult handleFlagSet(CommandContext context, EntityPlayer player) {
         PlotContext plotContext = resolvePlotContext(context, player);
         if (plotContext == null) {
             return context.fail();
@@ -225,12 +274,30 @@ public final class PlotCommand extends Command {
         if (plot == null) {
             return context.fail();
         }
-        EntityPlayer target = resolveSingleTarget(context, 0);
-        if (target == null) {
+        PlotFlag flag = context.getResult(0);
+        String rawValue = context.getResult(1);
+        if (PlotFlagValue.isReset(rawValue)) {
+            plot.removeFlag(flag.getLowerCaseName());
+            context.addOutput(messages.render(
+                    player,
+                    LangKeys.MESSAGE_FLAG_RESET,
+                    flag.getLowerCaseName(),
+                    PlotFlagValue.format(flag.defaultValue())
+            ));
+            return context.success();
+        }
+        Boolean parsed = PlotFlagValue.parseBoolean(rawValue);
+        if (parsed == null) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_FLAG_INVALID_VALUE));
             return context.fail();
         }
-        plot.removeDenied(target.getUniqueId());
-        context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_REMOVED, target.getDisplayName()));
+        plot.setFlag(flag, parsed);
+        context.addOutput(messages.render(
+                player,
+                LangKeys.MESSAGE_FLAG_SET,
+                flag.getLowerCaseName(),
+                PlotFlagValue.format(parsed)
+        ));
         return context.success();
     }
 
@@ -250,6 +317,19 @@ public final class PlotCommand extends Command {
         return new PlotContext(world, plotId, world.getPlot(plotId));
     }
 
+    private PlotContext resolveClaimedPlotContext(CommandContext context, EntityPlayer player) {
+        PlotContext plotContext = resolvePlotContext(context, player);
+        if (plotContext == null) {
+            return null;
+        }
+        Plot plot = plotContext.plot();
+        if (plot == null || !plot.isClaimed()) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+            return null;
+        }
+        return plotContext;
+    }
+
     private Plot requireOwnedPlot(CommandContext context, EntityPlayer player, PlotContext plotContext) {
         Plot plot = plotContext.plot();
         if (plot == null || !plot.isClaimed()) {
@@ -263,7 +343,6 @@ public final class PlotCommand extends Command {
         return plot;
     }
 
-    @SuppressWarnings("unchecked")
     private EntityPlayer resolveSingleTarget(CommandContext context, int index) {
         List<EntityPlayer> targets = context.getResult(index);
         if (targets == null || targets.isEmpty()) {
@@ -274,10 +353,26 @@ public final class PlotCommand extends Command {
             context.addTooManyTargetsError();
             return null;
         }
-        return targets.get(0);
+        return targets.getFirst();
     }
 
-    private CommandResult handleClaim(CommandContext context, EntityPlayer player, PlotContext plotContext) {
+    private PlotTarget resolveOwnedPlotTarget(CommandContext context, EntityPlayer player) {
+        PlotContext plotContext = resolvePlotContext(context, player);
+        if (plotContext == null) {
+            return null;
+        }
+        Plot plot = requireOwnedPlot(context, player, plotContext);
+        if (plot == null) {
+            return null;
+        }
+        EntityPlayer target = resolveSingleTarget(context, 0);
+        if (target == null) {
+            return null;
+        }
+        return new PlotTarget(plot, target);
+    }
+
+    private CommandResult handleClaim(CommandContext context, EntityPlayer player, PlotContext plotContext, boolean auto) {
         Plot plot = plotContext.plot();
         if (plot != null && plot.isClaimed()) {
             context.addOutput(messages.render(player, LangKeys.MESSAGE_ALREADY_CLAIMED));
@@ -309,6 +404,7 @@ public final class PlotCommand extends Command {
                 : player.getDisplayName();
         Plot claimed = plotService.claimPlot(plotContext.world(), plotContext.plotId(), player.getUniqueId(), ownerName);
         claimed.getDenied().remove(player.getUniqueId());
+        new PlotClaimEvent(player, plotContext.world(), plotContext.plotId(), claimed, auto).call();
         if (worldConfig.teleportOnClaim()) {
             teleportToPlot(player, plotContext.world(), plotContext.plotId());
         }
@@ -317,12 +413,12 @@ public final class PlotCommand extends Command {
     }
 
     private Currency resolveCurrency(Logger logger) {
-        if (config.economyCurrency().isBlank()) {
+        if (config.economy().currency().isBlank()) {
             return economyApi.getDefaultCurrency();
         }
-        Currency resolved = economyApi.getCurrency(config.economyCurrency());
+        Currency resolved = economyApi.getCurrency(config.economy().currency());
         if (resolved == null) {
-            logger.warn("Economy currency '{}' not found; using default currency.", config.economyCurrency());
+            logger.warn("Economy currency '{}' not found; using default currency.", config.economy().currency());
             return economyApi.getDefaultCurrency();
         }
         return resolved;
@@ -340,19 +436,59 @@ public final class PlotCommand extends Command {
         economyApi.getOrCreateAccount(uuid).deposit(currency, amount);
     }
 
+    private CommandResult teleportHome(CommandContext context, EntityPlayer player, UUID targetId, String targetName) {
+        PlotService.PlotLocation location = plotService.findHomePlot(targetId);
+        if (location == null) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_HOME_NOT_FOUND, targetName));
+            return context.fail();
+        }
+        Plot plot = location.plot();
+        if (plot != null
+                && !plot.canEnter(player.getUniqueId())
+                && !player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_ENTER_DENIED));
+            return context.fail();
+        }
+        teleportToPlot(player, location.world(), location.id());
+        context.addOutput(messages.render(
+                player,
+                LangKeys.MESSAGE_HOME_TELEPORT,
+                location.id().x(),
+                location.id().z(),
+                location.world().getConfig().worldName()
+        ));
+        return context.success();
+    }
+
+    private String renderFlags(Plot plot) {
+        StringBuilder builder = new StringBuilder();
+        for (PlotFlag flag : PlotFlag.values()) {
+            if (!builder.isEmpty()) {
+                builder.append(", ");
+            }
+            builder.append(flag.getLowerCaseName()).append("=").append(PlotFlagValue.format(plot.getFlag(flag)));
+        }
+        return builder.toString();
+    }
+
     private void teleportToPlot(EntityPlayer player, PlotWorld world, PlotId plotId) {
         var bounds = world.getPlotBounds(plotId);
         double x = bounds.minX() + (world.getConfig().plotSize() / 2.0);
         double z = bounds.minZ() + (world.getConfig().plotSize() / 2.0);
         double y = world.getConfig().groundY() + 1.0;
-        player.teleport(new org.allaymc.api.math.location.Location3d(
+        var targetWorld = Server.getInstance().getWorldPool().getWorld(world.getConfig().worldName());
+        var dimension = targetWorld != null ? targetWorld.getOverWorld() : player.getDimension();
+        player.teleport(new Location3d(
                 x,
                 y,
                 z,
                 player.getLocation().pitch(),
                 player.getLocation().yaw(),
-                player.getDimension()
+                dimension
         ));
+    }
+
+    private record PlotTarget(Plot plot, EntityPlayer target) {
     }
 
     private record PlotContext(PlotWorld world, PlotId plotId, Plot plot) {

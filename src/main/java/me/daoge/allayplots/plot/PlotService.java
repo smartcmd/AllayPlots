@@ -98,6 +98,41 @@ public final class PlotService {
         return world.findNextFreePlotId();
     }
 
+    public PlotLocation findHomePlot(UUID owner) {
+        PlotLocation fallback = null;
+        for (PlotWorld world : worlds.values()) {
+            for (Plot plot : world.getPlots().values()) {
+                if (!plot.isOwner(owner)) {
+                    continue;
+                }
+                PlotLocation location = new PlotLocation(world, plot.getId(), plot);
+                if (plot.isHome()) {
+                    return location;
+                }
+                if (fallback == null) {
+                    fallback = location;
+                }
+            }
+        }
+        return fallback;
+    }
+
+    public boolean setHomePlot(UUID owner, PlotWorld world, PlotId id) {
+        Plot plot = world.getPlot(id);
+        if (plot == null || !plot.isOwner(owner)) {
+            return false;
+        }
+        for (PlotWorld plotWorld : worlds.values()) {
+            for (Plot candidate : plotWorld.getPlots().values()) {
+                if (candidate.isOwner(owner) && candidate.isHome()) {
+                    candidate.setHome(false);
+                }
+            }
+        }
+        plot.setHome(true);
+        return true;
+    }
+
     public String resolvePlayerName(UUID uuid) {
         if (uuid == null) {
             return "";

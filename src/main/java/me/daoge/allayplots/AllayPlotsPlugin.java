@@ -8,7 +8,9 @@ import me.daoge.allayplots.i18n.MessageService;
 import me.daoge.allayplots.listener.PlotMovementListener;
 import me.daoge.allayplots.listener.PlotProtectionListener;
 import me.daoge.allayplots.plot.PlotService;
+import me.daoge.allayplots.storage.H2PlotStorage;
 import me.daoge.allayplots.storage.PlotStorage;
+import me.daoge.allayplots.storage.SqlitePlotStorage;
 import me.daoge.allayplots.storage.YamlPlotStorage;
 import org.allaymc.api.plugin.Plugin;
 import org.allaymc.api.registry.Registries;
@@ -17,6 +19,7 @@ import org.allaymc.api.server.Server;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 public final class AllayPlotsPlugin extends Plugin {
     private PluginConfig config;
@@ -39,7 +42,7 @@ public final class AllayPlotsPlugin extends Plugin {
         }
 
         config = PluginConfig.load(dataFolder, getPluginLogger());
-        plotStorage = new YamlPlotStorage(dataFolder, getPluginLogger());
+        plotStorage = createStorage(dataFolder);
         plotService = new PlotService(config, plotStorage, getPluginLogger());
         plotService.load();
         messageService = new MessageService();
@@ -52,8 +55,8 @@ public final class AllayPlotsPlugin extends Plugin {
 
         Registries.COMMANDS.register(new PlotCommand(plotService, config, messageService, getPluginLogger()));
 
-        if (config.autoSaveIntervalTicks() > 0) {
-            Server.getInstance().getScheduler().scheduleRepeating(this, plotService::save, config.autoSaveIntervalTicks());
+        if (config.settings().autoSaveIntervalTicks() > 0) {
+            Server.getInstance().getScheduler().scheduleRepeating(this, plotService::save, config.settings().autoSaveIntervalTicks());
         }
 
         getPluginLogger().info("AllayPlots enabled for {} plot worlds.", plotService.worldCount());
@@ -64,6 +67,20 @@ public final class AllayPlotsPlugin extends Plugin {
         if (plotService != null) {
             plotService.save();
         }
+    }
+
+    private PlotStorage createStorage(Path dataFolder) {
+        String rawType = config.storage().type();
+        String type = rawType == null ? "" : rawType.trim().toLowerCase(Locale.ROOT);
+        return switch (type) {
+            case "sqlite" -> new SqlitePlotStorage(dataFolder, getPluginLogger());
+            case "h2" -> new H2PlotStorage(dataFolder, getPluginLogger());
+            case "", "yaml", "yml" -> new YamlPlotStorage(dataFolder, getPluginLogger());
+            default -> {
+                getPluginLogger().warn("Unknown storage type '{}', falling back to yaml.", rawType);
+                yield new YamlPlotStorage(dataFolder, getPluginLogger());
+            }
+        };
     }
 
     private void ensurePlotWorldsLoaded() {

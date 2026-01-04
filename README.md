@@ -7,7 +7,8 @@ handling with EconomyAPI integration.
 
 - Plot claim, delete, and info queries
 - Trust/deny access control
-- Enter/leave plot events
+- Plot home and plot flags
+- Enter/leave/claim plot events
 - Plot protection for building and interactions
 - EconomyAPI integration for claim/refund pricing
 - Built-in i18n (en_US/zh_CN) and PlaceholderAPI support
@@ -23,10 +24,15 @@ handling with EconomyAPI integration.
 - `/plot auto` - Find and claim the next free plot
 - `/plot delete` - Delete the current plot (owner only)
 - `/plot info` - Show information about the current plot
+- `/plot home [player]` - Teleport to your plot home (or another player's)
+- `/plot sethome` - Set your plot home to the current plot
 - `/plot trust <player>` - Trust a player on your plot
 - `/plot untrust <player>` - Remove a trusted player
 - `/plot deny <player>` - Deny a player on your plot
 - `/plot undeny <player>` - Remove a denied player
+- `/plot flag [flag] [value]` - List, view, or set plot flags
+
+Supported flags: `entry`, `build`.
 
 ## ⚙️ Configuration
 
@@ -58,6 +64,13 @@ economy:
 ```
 
 When enabled, claiming deducts `claim-price` and deleting refunds `sell-refund`.
+
+Storage backends are configurable:
+
+```yaml
+storage:
+  type: yaml # yaml, sqlite, h2
+```
 
 ## 🌍 I18n
 

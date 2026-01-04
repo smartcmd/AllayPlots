@@ -16,15 +16,15 @@ public record PlotGeneratorPreset(
         String fillBlock,
         String bedrockBlock
 ) {
-    public static final String KEY_PLOT_SIZE = "plotSize";
-    public static final String KEY_ROAD_SIZE = "roadSize";
-    public static final String KEY_GROUND_Y = "groundY";
-    public static final String KEY_PLOT_BLOCK = "plotBlock";
-    public static final String KEY_ROAD_BLOCK = "roadBlock";
-    public static final String KEY_ROAD_EDGE_BLOCK = "roadEdgeBlock";
-    public static final String KEY_ROAD_CORNER_BLOCK = "roadCornerBlock";
-    public static final String KEY_FILL_BLOCK = "fillBlock";
-    public static final String KEY_BEDROCK_BLOCK = "bedrockBlock";
+    public static final String KEY_PLOT_SIZE = "plot-size";
+    public static final String KEY_ROAD_SIZE = "road-size";
+    public static final String KEY_GROUND_Y = "ground-y";
+    public static final String KEY_PLOT_BLOCK = "plot-block";
+    public static final String KEY_ROAD_BLOCK = "road-block";
+    public static final String KEY_ROAD_EDGE_BLOCK = "road-edge-block";
+    public static final String KEY_ROAD_CORNER_BLOCK = "road-corner-block";
+    public static final String KEY_FILL_BLOCK = "fill-block";
+    public static final String KEY_BEDROCK_BLOCK = "bedrock-block";
 
     public static PlotGeneratorPreset defaults() {
         return new PlotGeneratorPreset(

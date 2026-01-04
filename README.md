@@ -1,14 +1,6 @@
-# 🌾 AllayPlots
-
 <div align="center">
 
-<img src="logo.svg" alt="AllayPlots Logo" width="200"/>
-
-**A powerful plot management plugin for AllayMC**
-
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
-[![Gradle](https://img.shields.io/badge/Gradle-8.x-green.svg)](https://gradle.org/)
+<img src="logo.svg" alt="AllayPlots Logo"/>
 
 </div>
 

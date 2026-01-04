@@ -84,11 +84,18 @@ public final class PlotMovementListener {
             String ownerName = plotService.resolvePlayerName(plot.getOwner());
             ownerInfo = messages.renderInline(player, config.messages().claimedInfo(), ownerName);
         }
-        return messages.render(player, config.messages().enter(), plotId.asString(), ownerInfo, world.getConfig().worldName());
+        return messages.render(
+                player,
+                config.messages().enter(),
+                plotId.x(),
+                plotId.z(),
+                ownerInfo,
+                world.getConfig().worldName()
+        );
     }
 
     private String renderLeaveMessage(EntityPlayer player, PlotId plotId) {
-        return messages.render(player, config.messages().leave(), plotId.asString());
+        return messages.render(player, config.messages().leave(), plotId.x(), plotId.z());
     }
 
     private void sendMessage(EntityPlayer player, String message) {

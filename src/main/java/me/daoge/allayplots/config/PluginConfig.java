@@ -77,65 +77,44 @@ public final class PluginConfig {
         Config config = new Config(dataFolder.resolve("config.yml").toFile(), Config.YAML, defaults);
         boolean economyEnabled = config.getBoolean("economy.enabled", false);
         String economyCurrency = config.getString("economy.currency", "");
-        boolean protectRoads = config.getBoolean("settings.protect-roads",
-                config.getBoolean("settings.protectRoads", true));
-        int autoSaveIntervalTicks = config.getInt("settings.auto-save-interval-ticks",
-                config.getInt("settings.autoSaveIntervalTicks", 6000));
-        boolean useActionBar = config.getBoolean("settings.use-action-bar",
-                config.getBoolean("settings.useActionBar", true));
+        boolean protectRoads = config.getBoolean("settings.protect-roads", true);
+        int autoSaveIntervalTicks = config.getInt("settings.auto-save-interval-ticks", 6000);
+        boolean useActionBar = config.getBoolean("settings.use-action-bar", true);
 
         Messages messages = new Messages(
                 config.getString("messages.prefix", LangKeys.MESSAGE_PREFIX),
                 config.getString("messages.enter", LangKeys.MESSAGE_ENTER),
                 config.getString("messages.leave", LangKeys.MESSAGE_LEAVE),
-                config.getString("messages.enter-denied",
-                        config.getString("messages.enterDenied", LangKeys.MESSAGE_ENTER_DENIED)),
-                config.getString("messages.build-denied",
-                        config.getString("messages.buildDenied", LangKeys.MESSAGE_BUILD_DENIED)),
-                config.getString("messages.not-in-plot",
-                        config.getString("messages.notInPlot", LangKeys.MESSAGE_NOT_IN_PLOT)),
-                config.getString("messages.not-plot-world",
-                        config.getString("messages.notPlotWorld", LangKeys.MESSAGE_NOT_PLOT_WORLD)),
-                config.getString("messages.already-claimed",
-                        config.getString("messages.alreadyClaimed", LangKeys.MESSAGE_ALREADY_CLAIMED)),
-                config.getString("messages.claim-success",
-                        config.getString("messages.claimSuccess", LangKeys.MESSAGE_CLAIM_SUCCESS)),
-                config.getString("messages.delete-success",
-                        config.getString("messages.deleteSuccess", LangKeys.MESSAGE_DELETE_SUCCESS)),
-                config.getString("messages.plot-unclaimed",
-                        config.getString("messages.plotUnclaimed", LangKeys.MESSAGE_PLOT_UNCLAIMED)),
-                config.getString("messages.not-owner",
-                        config.getString("messages.notOwner", LangKeys.MESSAGE_NOT_OWNER)),
-                config.getString("messages.too-many-plots",
-                        config.getString("messages.tooManyPlots", LangKeys.MESSAGE_TOO_MANY_PLOTS)),
-                config.getString("messages.not-enough-money",
-                        config.getString("messages.notEnoughMoney", LangKeys.MESSAGE_NOT_ENOUGH_MONEY)),
-                config.getString("messages.trust-added",
-                        config.getString("messages.trustAdded", LangKeys.MESSAGE_TRUST_ADDED)),
-                config.getString("messages.trust-removed",
-                        config.getString("messages.trustRemoved", LangKeys.MESSAGE_TRUST_REMOVED)),
-                config.getString("messages.deny-added",
-                        config.getString("messages.denyAdded", LangKeys.MESSAGE_DENY_ADDED)),
-                config.getString("messages.deny-removed",
-                        config.getString("messages.denyRemoved", LangKeys.MESSAGE_DENY_REMOVED)),
-                config.getString("messages.unclaimed-info",
-                        config.getString("messages.unclaimedInfo", LangKeys.MESSAGE_UNCLAIMED_INFO)),
-                config.getString("messages.claimed-info",
-                        config.getString("messages.claimedInfo", LangKeys.MESSAGE_CLAIMED_INFO))
+                config.getString("messages.enter-denied", LangKeys.MESSAGE_ENTER_DENIED),
+                config.getString("messages.build-denied", LangKeys.MESSAGE_BUILD_DENIED),
+                config.getString("messages.not-in-plot", LangKeys.MESSAGE_NOT_IN_PLOT),
+                config.getString("messages.not-plot-world", LangKeys.MESSAGE_NOT_PLOT_WORLD),
+                config.getString("messages.already-claimed", LangKeys.MESSAGE_ALREADY_CLAIMED),
+                config.getString("messages.claim-success", LangKeys.MESSAGE_CLAIM_SUCCESS),
+                config.getString("messages.delete-success", LangKeys.MESSAGE_DELETE_SUCCESS),
+                config.getString("messages.plot-unclaimed", LangKeys.MESSAGE_PLOT_UNCLAIMED),
+                config.getString("messages.not-owner", LangKeys.MESSAGE_NOT_OWNER),
+                config.getString("messages.too-many-plots", LangKeys.MESSAGE_TOO_MANY_PLOTS),
+                config.getString("messages.not-enough-money", LangKeys.MESSAGE_NOT_ENOUGH_MONEY),
+                config.getString("messages.trust-added", LangKeys.MESSAGE_TRUST_ADDED),
+                config.getString("messages.trust-removed", LangKeys.MESSAGE_TRUST_REMOVED),
+                config.getString("messages.deny-added", LangKeys.MESSAGE_DENY_ADDED),
+                config.getString("messages.deny-removed", LangKeys.MESSAGE_DENY_REMOVED),
+                config.getString("messages.unclaimed-info", LangKeys.MESSAGE_UNCLAIMED_INFO),
+                config.getString("messages.claimed-info", LangKeys.MESSAGE_CLAIMED_INFO)
         );
 
         Map<String, PlotWorldConfig> worlds = new HashMap<>();
         ConfigSection worldSection = config.getSection("worlds");
         for (String worldName : worldSection.getKeys(false)) {
             ConfigSection entry = worldSection.getSection(worldName);
-            int plotSize = Math.max(1, entry.getInt("plot-size", entry.getInt("plotSize", 35)));
-            int roadSize = Math.max(0, entry.getInt("road-size", entry.getInt("roadSize", 7)));
-            int groundY = entry.getInt("ground-y", entry.getInt("groundY", 64));
-            int maxPlotsPerPlayer = entry.getInt("max-plots-per-player", entry.getInt("maxPlotsPerPlayer", 2));
-            double claimPrice = entry.getDouble("claim-price", entry.getDouble("claimPrice", 0.0));
-            double sellRefund = entry.getDouble("sell-refund", entry.getDouble("sellRefund", 0.0));
-            boolean teleportOnClaim = entry.getBoolean("teleport-on-claim",
-                    entry.getBoolean("teleportOnClaim", true));
+            int plotSize = Math.max(1, entry.getInt("plot-size", 35));
+            int roadSize = Math.max(0, entry.getInt("road-size", 7));
+            int groundY = entry.getInt("ground-y", 64);
+            int maxPlotsPerPlayer = entry.getInt("max-plots-per-player", 2);
+            double claimPrice = entry.getDouble("claim-price", 0.0);
+            double sellRefund = entry.getDouble("sell-refund", 0.0);
+            boolean teleportOnClaim = entry.getBoolean("teleport-on-claim", true);
             String roadEdgeBlock = entry.getString("road-edge-block", "minecraft:smooth_stone_slab");
             String roadCornerBlock = entry.getString("road-corner-block", "minecraft:smooth_stone_slab");
             worlds.put(worldName, new PlotWorldConfig(

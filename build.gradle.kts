@@ -19,16 +19,20 @@ allay {
     plugin {
         entrance = ".AllayPlotsPlugin"
         authors += "daoge_cmd"
-        authors += "Ovis Development"
         website = "https://github.com/smartcmd/AllayPlots"
         dependency(name = "EconomyAPI")
         dependency(name = "PlaceholderAPI")
     }
 }
 
+repositories {
+    maven("https://storehouse.okaeri.eu/repository/maven-public/")
+}
+
 dependencies {
     compileOnly(group = "org.projectlombok", name = "lombok", version = "1.18.34")
     compileOnly(group = "org.allaymc", name = "economy-api", version = "0.2.2")
     compileOnly(group = "org.allaymc", name = "papi", version = "0.2.0")
+    implementation(group = "eu.okaeri", name = "okaeri-configs-yaml-snakeyaml", version = "5.0.13")
     annotationProcessor(group = "org.projectlombok", name = "lombok", version = "1.18.34")
 }

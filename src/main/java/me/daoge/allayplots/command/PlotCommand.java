@@ -144,9 +144,13 @@ public final class PlotCommand extends Command {
             String ownerName = plotService.resolvePlayerName(plot.getOwner());
             ownerText = messages.renderInline(player, config.messages().claimedInfo(), ownerName);
         }
-        context.addOutput(messages.renderInline(player, LangKeys.COMMAND_PLOT_INFO_HEADER,
-                plotContext.plotId().asString(),
-                plotContext.world().getConfig().worldName()));
+        context.addOutput(messages.renderInline(
+                player,
+                LangKeys.COMMAND_PLOT_INFO_HEADER,
+                plotContext.plotId().x(),
+                plotContext.plotId().z(),
+                plotContext.world().getConfig().worldName()
+        ));
         context.addOutput(ownerText);
         if (plot != null && plot.isClaimed()) {
             context.addOutput(messages.renderInline(player, LangKeys.COMMAND_PLOT_INFO_ACCESS,

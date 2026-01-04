@@ -1,7 +1,7 @@
 # 🌾 AllayPlots
 
-AllayPlots is an AllayMC-native plot plugin ported from FuturePlots (PowerNukkitX). It provides plot claiming,
-deletion, permissions, and enter/leave handling with EconomyAPI integration.
+AllayPlots is a plot plugin for AllayMC. It provides plot claiming, deletion, permissions, and enter/leave
+handling with EconomyAPI integration.
 
 ## ✨ Features
 
@@ -30,7 +30,8 @@ deletion, permissions, and enter/leave handling with EconomyAPI integration.
 
 ## ⚙️ Configuration
 
-Config file is created at `plugins/AllayPlots/config.yml`. The `worlds` section defines plot worlds and sizes:
+Config file is created at `plugins/AllayPlots/config.yml`. A full example is available in `config.yml`.
+All keys use hyphen style. Message entries are i18n keys (snake_case).
 
 ```yaml
 worlds:

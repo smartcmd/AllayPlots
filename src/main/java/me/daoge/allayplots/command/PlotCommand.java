@@ -6,13 +6,7 @@ import me.daoge.allayplots.config.PluginConfig;
 import me.daoge.allayplots.event.PlotClaimEvent;
 import me.daoge.allayplots.i18n.LangKeys;
 import me.daoge.allayplots.i18n.MessageService;
-import me.daoge.allayplots.plot.Plot;
-import me.daoge.allayplots.plot.PlotFlag;
-import me.daoge.allayplots.plot.PlotFlagValue;
-import me.daoge.allayplots.plot.PlotId;
-import me.daoge.allayplots.plot.PlotMergeDirection;
-import me.daoge.allayplots.plot.PlotService;
-import me.daoge.allayplots.plot.PlotWorld;
+import me.daoge.allayplots.plot.*;
 import org.allaymc.api.command.Command;
 import org.allaymc.api.command.CommandResult;
 import org.allaymc.api.command.SenderType;
@@ -473,7 +467,7 @@ public final class PlotCommand extends Command {
         Plot claimed = plotService.claimPlot(pc.world(), pc.plotId(), player.getUniqueId(), resolveOwnerName(player));
         claimed.getDenied().remove(player.getUniqueId());
 
-        new PlotClaimEvent(player, pc.world(), claimed, auto).call();
+        new PlotClaimEvent(player, pc.world(), claimed).call();
 
         if (wc.teleportOnClaim()) {
             teleportToPlot(player, pc.world(), pc.plotId());

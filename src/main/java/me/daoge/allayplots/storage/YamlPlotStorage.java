@@ -9,12 +9,7 @@ import org.allaymc.api.utils.config.ConfigSection;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public final class YamlPlotStorage implements PlotStorage {
     private final Path file;

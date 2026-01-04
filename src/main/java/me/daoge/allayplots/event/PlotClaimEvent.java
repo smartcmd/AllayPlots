@@ -1,9 +1,8 @@
 package me.daoge.allayplots.event;
 
-import me.daoge.allayplots.plot.Plot;
-import me.daoge.allayplots.plot.PlotId;
-import me.daoge.allayplots.plot.PlotWorld;
 import lombok.Getter;
+import me.daoge.allayplots.plot.Plot;
+import me.daoge.allayplots.plot.PlotWorld;
 import org.allaymc.api.entity.interfaces.EntityPlayer;
 import org.allaymc.api.eventbus.event.player.PlayerEvent;
 
@@ -11,12 +10,10 @@ import org.allaymc.api.eventbus.event.player.PlayerEvent;
 public class PlotClaimEvent extends PlayerEvent {
     private final PlotWorld world;
     private final Plot plot;
-    private final boolean auto;
 
-    public PlotClaimEvent(EntityPlayer player, PlotWorld world, Plot plot, boolean auto) {
+    public PlotClaimEvent(EntityPlayer player, PlotWorld world, Plot plot) {
         super(player);
         this.world = world;
         this.plot = plot;
-        this.auto = auto;
     }
 }

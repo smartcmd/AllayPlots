@@ -58,12 +58,12 @@ public final class PlotMovementListener {
         }
 
         if (fromPlot != null) {
-            new PlotLeaveEvent(player, fromPlot.world(), fromPlot.plot()).call();
+            new PlotLeaveEvent(player, fromPlot.world(), fromPlot.id(), fromPlot.plot()).call();
             sendMessage(player, renderLeaveMessage(player, fromPlot.id()));
         }
 
         if (toPlot != null) {
-            PlotEnterEvent enterEvent = new PlotEnterEvent(player, toPlot.world(), toPlot.plot());
+            PlotEnterEvent enterEvent = new PlotEnterEvent(player, toPlot.world(), toPlot.id(), toPlot.plot());
             if (!enterEvent.call()) {
                 event.setCancelled(true);
                 return;

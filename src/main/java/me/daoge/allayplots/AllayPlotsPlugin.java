@@ -1,8 +1,8 @@
 package me.daoge.allayplots;
 
 import me.daoge.allayplots.command.PlotCommand;
-import me.daoge.allayplots.config.PluginConfig;
 import me.daoge.allayplots.config.PlotWorldConfig;
+import me.daoge.allayplots.config.PluginConfig;
 import me.daoge.allayplots.generator.PlotWorldGeneratorFactory;
 import me.daoge.allayplots.i18n.MessageService;
 import me.daoge.allayplots.listener.PlotDamageListener;

@@ -1,21 +1,22 @@
 package me.daoge.allayplots.plot;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class Plot {
     private final String worldName;
     private final PlotId id;
-    private volatile UUID owner;
-    private volatile String ownerName;
-    private volatile boolean home;
-    private final Set<UUID> trusted = ConcurrentHashMap.newKeySet();
-    private final Set<UUID> denied = ConcurrentHashMap.newKeySet();
-    private final Map<String, String> flags = new ConcurrentHashMap<>();
-    private final Set<PlotMergeDirection> mergedDirections = ConcurrentHashMap.newKeySet();
+    private UUID owner;
+    private String ownerName;
+    private boolean home;
+    private final Set<UUID> trusted = new HashSet<>();
+    private final Set<UUID> denied = new HashSet<>();
+    private final Map<String, String> flags = new HashMap<>();
+    private final Set<PlotMergeDirection> mergedDirections = new HashSet<>();
 
     public Plot(String worldName, PlotId id) {
         this.worldName = worldName;

@@ -3,11 +3,10 @@ package me.daoge.allayplots.plot;
 import me.daoge.allayplots.config.PlotWorldConfig;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class PlotWorld {
     private final PlotWorldConfig config;
-    private final Map<PlotId, Plot> plots = new ConcurrentHashMap<>();
+    private final Map<PlotId, Plot> plots = new HashMap<>();
 
     public PlotWorld(PlotWorldConfig config) {
         this.config = config;

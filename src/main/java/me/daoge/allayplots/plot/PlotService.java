@@ -16,10 +16,10 @@ import org.allaymc.api.world.Dimension;
 import org.slf4j.Logger;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public final class PlotService {
@@ -27,9 +27,9 @@ public final class PlotService {
     private final PlotStorage storage;
     private final Logger logger;
 
-    private final Map<String, PlotWorld> worlds = new ConcurrentHashMap<>();
-    private final Map<UUID, String> ownerNames = new ConcurrentHashMap<>();
-    private final Set<UUID> ownerNameSynced = ConcurrentHashMap.newKeySet();
+    private final Map<String, PlotWorld> worlds = new HashMap<>();
+    private final Map<UUID, String> ownerNames = new HashMap<>();
+    private final Set<UUID> ownerNameSynced = new HashSet<>();
 
     public PlotService(PluginConfig config, PlotStorage storage, Logger logger) {
         this.config = config;
@@ -60,7 +60,7 @@ public final class PlotService {
     }
 
     public void save() {
-        storage.save(worlds);
+        storage.save(new HashMap<>(worlds));
     }
 
     public int worldCount() {

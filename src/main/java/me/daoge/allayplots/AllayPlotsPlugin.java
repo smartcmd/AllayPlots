@@ -5,6 +5,7 @@ import me.daoge.allayplots.config.PluginConfig;
 import me.daoge.allayplots.config.PlotWorldConfig;
 import me.daoge.allayplots.generator.PlotWorldGeneratorFactory;
 import me.daoge.allayplots.i18n.MessageService;
+import me.daoge.allayplots.listener.PlotDamageListener;
 import me.daoge.allayplots.listener.PlotMovementListener;
 import me.daoge.allayplots.listener.PlotProtectionListener;
 import me.daoge.allayplots.plot.PlotService;
@@ -52,6 +53,7 @@ public final class AllayPlotsPlugin extends Plugin {
         var eventBus = Server.getInstance().getEventBus();
         eventBus.registerListener(new PlotProtectionListener(plotService, config, messageService));
         eventBus.registerListener(new PlotMovementListener(plotService, config, messageService));
+        eventBus.registerListener(new PlotDamageListener(plotService));
 
         Registries.COMMANDS.register(new PlotCommand(plotService, config, messageService, getPluginLogger()));
 

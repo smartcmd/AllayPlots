@@ -32,12 +32,18 @@ handling with EconomyAPI integration.
 - `/plot undeny <player>` - Remove a denied player
 - `/plot flag [flag] [value]` - List, view, or set plot flags
 
-Supported flags: `entry`, `build`.
+Supported flags:
+
+- `entry` - allow players to enter the plot.
+- `build` - allow non-members to build in the plot.
+- `pvp` - allow player vs player damage.
+- `pve` - allow player damage to entities.
+- `damage` - allow players to receive damage.
 
 ## ⚙️ Configuration
 
 Config file is created at `plugins/AllayPlots/config.yml`. A full example is available in `config.yml`.
-All keys use hyphen style. Messages are fixed to i18n keys and are not configurable.
+All keys use hyphen style.
 
 ```yaml
 worlds:
@@ -71,10 +77,6 @@ Storage backends are configurable:
 storage:
   type: yaml # yaml, sqlite, h2
 ```
-
-## 🌍 I18n
-
-Translations live under `src/main/resources/assets/lang/` and are loaded by Allay's i18n system.
 
 ## License
 

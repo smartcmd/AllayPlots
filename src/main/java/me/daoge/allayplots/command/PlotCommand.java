@@ -144,7 +144,7 @@ public final class PlotCommand extends Command {
     }
 
     private CommandResult handleHomeOther(CommandContext context, EntityPlayer player) {
-        List<EntityPlayer> targets = context.getResult(0);
+        List<EntityPlayer> targets = context.getResult(1);
         if (targets == null || targets.isEmpty()) {
             return teleportHome(context, player, player.getUniqueId(), player.getDisplayName());
         }
@@ -242,11 +242,11 @@ public final class PlotCommand extends Command {
     }
 
     private CommandResult handleFlag(CommandContext context, EntityPlayer player) {
-        PlotFlag flag = context.getResult(0);
+        PlotFlag flag = context.getResult(1);
         if (flag == null) {
             return handleFlagList(context, player);
         }
-        String rawValue = context.getResult(1);
+        String rawValue = context.getResult(2);
         if (rawValue == null || rawValue.isBlank()) {
             return handleFlagShow(context, player);
         }
@@ -259,7 +259,7 @@ public final class PlotCommand extends Command {
             return context.fail();
         }
         Plot plot = plotContext.plot();
-        PlotFlag flag = context.getResult(0);
+        PlotFlag flag = context.getResult(1);
         context.addOutput(messages.render(player, LangKeys.MESSAGE_FLAG_VALUE, flag.getLowerCaseName(),
                 PlotFlagValue.format(plot.getFlag(flag))));
         return context.success();
@@ -274,8 +274,8 @@ public final class PlotCommand extends Command {
         if (plot == null) {
             return context.fail();
         }
-        PlotFlag flag = context.getResult(0);
-        String rawValue = context.getResult(1);
+        PlotFlag flag = context.getResult(1);
+        String rawValue = context.getResult(2);
         if (PlotFlagValue.isReset(rawValue)) {
             plot.removeFlag(flag.getLowerCaseName());
             context.addOutput(messages.render(
@@ -365,7 +365,7 @@ public final class PlotCommand extends Command {
         if (plot == null) {
             return null;
         }
-        EntityPlayer target = resolveSingleTarget(context, 0);
+        EntityPlayer target = resolveSingleTarget(context, 1);
         if (target == null) {
             return null;
         }

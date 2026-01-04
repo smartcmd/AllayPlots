@@ -4,7 +4,10 @@ import java.util.Locale;
 
 public enum PlotFlag {
     ENTRY(true),
-    BUILD(false);
+    BUILD(false),
+    PVP(true),
+    PVE(true),
+    DAMAGE(true);
 
     private final boolean defaultValue;
 

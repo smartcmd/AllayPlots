@@ -10,14 +10,12 @@ import org.allaymc.api.eventbus.event.player.PlayerEvent;
 @Getter
 public class PlotClaimEvent extends PlayerEvent {
     private final PlotWorld world;
-    private final PlotId plotId;
     private final Plot plot;
     private final boolean auto;
 
-    public PlotClaimEvent(EntityPlayer player, PlotWorld world, PlotId plotId, Plot plot, boolean auto) {
+    public PlotClaimEvent(EntityPlayer player, PlotWorld world, Plot plot, boolean auto) {
         super(player);
         this.world = world;
-        this.plotId = plotId;
         this.plot = plot;
         this.auto = auto;
     }

@@ -15,6 +15,7 @@ public final class Plot {
     private final Set<UUID> trusted = ConcurrentHashMap.newKeySet();
     private final Set<UUID> denied = ConcurrentHashMap.newKeySet();
     private final Map<String, String> flags = new ConcurrentHashMap<>();
+    private final Set<PlotMergeDirection> mergedDirections = ConcurrentHashMap.newKeySet();
 
     public Plot(String worldName, PlotId id) {
         this.worldName = worldName;
@@ -40,6 +41,7 @@ public final class Plot {
             trusted.clear();
             denied.clear();
             flags.clear();
+            mergedDirections.clear();
             home = false;
         }
         if (owner == null) {
@@ -89,6 +91,30 @@ public final class Plot {
 
     public Map<String, String> getFlags() {
         return flags;
+    }
+
+    public Set<PlotMergeDirection> getMergedDirections() {
+        return mergedDirections;
+    }
+
+    public boolean isMerged(PlotMergeDirection direction) {
+        return mergedDirections.contains(direction);
+    }
+
+    public void addMergedDirection(PlotMergeDirection direction) {
+        if (direction != null) {
+            mergedDirections.add(direction);
+        }
+    }
+
+    public void removeMergedDirection(PlotMergeDirection direction) {
+        if (direction != null) {
+            mergedDirections.remove(direction);
+        }
+    }
+
+    public void clearMergedDirections() {
+        mergedDirections.clear();
     }
 
     public boolean getFlag(PlotFlag flag) {
@@ -162,6 +188,7 @@ public final class Plot {
     }
 
     public boolean isDefault() {
-        return owner == null && trusted.isEmpty() && denied.isEmpty() && flags.isEmpty() && !home;
+        return owner == null && trusted.isEmpty() && denied.isEmpty() && flags.isEmpty()
+                && mergedDirections.isEmpty() && !home;
     }
 }

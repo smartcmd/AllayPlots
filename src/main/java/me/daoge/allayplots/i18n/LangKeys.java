@@ -14,6 +14,13 @@ public final class LangKeys {
     public static final String MESSAGE_ALREADY_CLAIMED = "allayplots:message.already_claimed";
     public static final String MESSAGE_CLAIM_SUCCESS = "allayplots:message.claim_success";
     public static final String MESSAGE_DELETE_SUCCESS = "allayplots:message.delete_success";
+    public static final String MESSAGE_MERGE_SUCCESS = "allayplots:message.merge_success";
+    public static final String MESSAGE_MERGE_ALREADY = "allayplots:message.merge_already";
+    public static final String MESSAGE_MERGE_NOT_SAME_OWNER = "allayplots:message.merge_not_same_owner";
+    public static final String MESSAGE_MERGE_TARGET_UNCLAIMED = "allayplots:message.merge_target_unclaimed";
+    public static final String MESSAGE_MERGE_FAILED = "allayplots:message.merge_failed";
+    public static final String MESSAGE_UNMERGE_SUCCESS = "allayplots:message.unmerge_success";
+    public static final String MESSAGE_UNMERGE_NOT_MERGED = "allayplots:message.unmerge_not_merged";
     public static final String MESSAGE_PLOT_UNCLAIMED = "allayplots:message.plot_unclaimed";
     public static final String MESSAGE_NOT_OWNER = "allayplots:message.not_owner";
     public static final String MESSAGE_TOO_MANY_PLOTS = "allayplots:message.too_many_plots";

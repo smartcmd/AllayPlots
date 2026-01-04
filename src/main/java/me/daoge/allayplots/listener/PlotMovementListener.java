@@ -112,7 +112,8 @@ public final class PlotMovementListener {
             if (location == null) {
                 return null;
             }
-            return new PlotKey(location.world().getConfig().worldName(), location.id());
+            PlotId root = location.world().getMergeRoot(location.id());
+            return new PlotKey(location.world().getConfig().worldName(), root);
         }
     }
 }

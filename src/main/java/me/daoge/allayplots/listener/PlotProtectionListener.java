@@ -5,9 +5,7 @@ import me.daoge.allayplots.config.PluginConfig;
 import me.daoge.allayplots.i18n.LangKeys;
 import me.daoge.allayplots.i18n.MessageService;
 import me.daoge.allayplots.plot.Plot;
-import me.daoge.allayplots.plot.PlotId;
 import me.daoge.allayplots.plot.PlotService;
-import me.daoge.allayplots.plot.PlotWorld;
 import org.allaymc.api.block.dto.Block;
 import org.allaymc.api.entity.interfaces.EntityPlayer;
 import org.allaymc.api.eventbus.EventHandler;
@@ -92,22 +90,18 @@ public final class PlotProtectionListener {
     }
 
     private boolean shouldCancel(EntityPlayer player, Dimension dimension, int x, int z) {
-        PlotWorld world = plotService.getPlotWorld(dimension);
-        if (world == null) {
-            return false;
-        }
         if (player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
             return false;
         }
-        PlotId id = world.getPlotIdAt(x, z);
-        if (id == null) {
+        PlotService.PlotLocation location = plotService.resolvePlot(dimension, x, z);
+        if (location == null) {
             if (config.settings().protectRoads()) {
                 player.sendMessage(messages.render(player, LangKeys.MESSAGE_BUILD_DENIED));
                 return true;
             }
             return false;
         }
-        Plot plot = world.getPlot(id);
+        Plot plot = location.plot();
         if (plot == null || !plot.canBuild(player.getUniqueId())) {
             player.sendMessage(messages.render(player, LangKeys.MESSAGE_BUILD_DENIED));
             return true;

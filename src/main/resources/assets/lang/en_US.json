@@ -9,6 +9,13 @@
   "allayplots:message.already_claimed": "&cThis plot is already claimed.",
   "allayplots:message.claim_success": "&aPlot claimed successfully.",
   "allayplots:message.delete_success": "&aPlot deleted.",
+  "allayplots:message.merge_success": "&aPlots merged with &e(%1, %2)&a.",
+  "allayplots:message.merge_already": "&cPlots are already merged in that direction.",
+  "allayplots:message.merge_not_same_owner": "&cYou can only merge plots with the same owner.",
+  "allayplots:message.merge_target_unclaimed": "&cTarget plot is unclaimed.",
+  "allayplots:message.merge_failed": "&cFailed to merge plots.",
+  "allayplots:message.unmerge_success": "&aPlots unmerged with &e(%1, %2)&a.",
+  "allayplots:message.unmerge_not_merged": "&cPlots are not merged in that direction.",
   "allayplots:message.plot_unclaimed": "&cThis plot is unclaimed.",
   "allayplots:message.not_owner": "&cYou are not the plot owner.",
   "allayplots:message.too_many_plots": "&cYou have reached your plot limit &7(&e%1&7).",
@@ -29,7 +36,7 @@
   "allayplots:message.flag_reset": "&aFlag &e%1 &areset to default (&f%2&a).",
   "allayplots:message.flag_invalid_value": "&cInvalid flag value. Use true/false, on/off, allow/deny.",
   "allayplots:command.plot.description": "Plot management commands",
-  "allayplots:command.plot.help": "&7Commands: &eclaim&7, &eauto&7, &edelete&7, &einfo&7, &ehome&7, &esethome&7, &etrust&7, &euntrust&7, &edeny&7, &eundeny&7, &eflag",
+  "allayplots:command.plot.help": "&7Commands: &eclaim&7, &eauto&7, &edelete&7, &emerge&7, &eunmerge&7, &einfo&7, &ehome&7, &esethome&7, &etrust&7, &euntrust&7, &edeny&7, &eundeny&7, &eflag",
   "allayplots:command.plot.info.header": "&6Plot &e(%1, %2) &7(&f%3&7)",
   "allayplots:command.plot.info.access": "&7Trusted: &a%1 &8| &7Denied: &c%2"
 }

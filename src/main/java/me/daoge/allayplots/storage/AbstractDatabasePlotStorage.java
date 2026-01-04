@@ -2,6 +2,7 @@ package me.daoge.allayplots.storage;
 
 import me.daoge.allayplots.plot.Plot;
 import me.daoge.allayplots.plot.PlotId;
+import me.daoge.allayplots.plot.PlotMergeDirection;
 import me.daoge.allayplots.plot.PlotWorld;
 import org.slf4j.Logger;
 
@@ -53,6 +54,15 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
                 PRIMARY KEY (world_name, plot_x, plot_z, flag_key)
             )
             """;
+    private static final String CREATE_MERGED_TABLE_SQL = """
+            CREATE TABLE IF NOT EXISTS plot_merged (
+                world_name VARCHAR(255) NOT NULL,
+                plot_x INTEGER NOT NULL,
+                plot_z INTEGER NOT NULL,
+                direction VARCHAR(16) NOT NULL,
+                PRIMARY KEY (world_name, plot_x, plot_z, direction)
+            )
+            """;
 
     protected final Path dataFolder;
     protected final Logger logger;
@@ -79,6 +89,7 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
             loadAccessList(connection, result, "plot_trusted", true);
             loadAccessList(connection, result, "plot_denied", false);
             loadFlags(connection, result);
+            loadMerged(connection, result);
             pruneDefaults(result);
         } catch (SQLException ex) {
             logger.error("Failed to load plot data from {} storage.", getDatabaseName(), ex);
@@ -97,6 +108,7 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
                 insertAccessLists(connection, worlds, true);
                 insertAccessLists(connection, worlds, false);
                 insertFlags(connection, worlds);
+                insertMerged(connection, worlds);
                 connection.commit();
             } catch (SQLException ex) {
                 connection.rollback();
@@ -135,12 +147,14 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
             stmt.execute(CREATE_TRUSTED_TABLE_SQL);
             stmt.execute(CREATE_DENIED_TABLE_SQL);
             stmt.execute(CREATE_FLAGS_TABLE_SQL);
+            stmt.execute(CREATE_MERGED_TABLE_SQL);
         }
     }
 
     private void clearTables(Connection connection) throws SQLException {
         try (Statement stmt = connection.createStatement()) {
             stmt.executeUpdate("DELETE FROM plot_flags");
+            stmt.executeUpdate("DELETE FROM plot_merged");
             stmt.executeUpdate("DELETE FROM plot_denied");
             stmt.executeUpdate("DELETE FROM plot_trusted");
             stmt.executeUpdate("DELETE FROM plots");
@@ -218,6 +232,29 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
                     continue;
                 }
                 plot.setFlagRaw(key, value);
+            }
+        }
+    }
+
+    private void loadMerged(Connection connection, Map<String, Map<PlotId, Plot>> result) throws SQLException {
+        String sql = "SELECT world_name, plot_x, plot_z, direction FROM plot_merged";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                Plot plot = resolvePlot(result, rs.getString("world_name"), rs.getInt("plot_x"), rs.getInt("plot_z"));
+                if (plot == null) {
+                    continue;
+                }
+                String raw = rs.getString("direction");
+                PlotMergeDirection direction = PlotMergeDirection.fromString(raw);
+                if (direction == null) {
+                    if (raw != null && !raw.isBlank()) {
+                        logger.warn("Invalid merge direction {} for plot {} in {}", raw, plot.getId().asString(),
+                                plot.getWorldName());
+                    }
+                    continue;
+                }
+                plot.addMergedDirection(direction);
             }
         }
     }
@@ -313,6 +350,28 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
                         stmt.setInt(3, plot.getId().z());
                         stmt.setString(4, entry.getKey());
                         stmt.setString(5, value);
+                        stmt.addBatch();
+                    }
+                }
+            }
+            stmt.executeBatch();
+        }
+    }
+
+    private void insertMerged(Connection connection, Map<String, PlotWorld> worlds) throws SQLException {
+        String sql = "INSERT INTO plot_merged (world_name, plot_x, plot_z, direction) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            for (PlotWorld world : worlds.values()) {
+                String worldName = world.getConfig().worldName();
+                for (Plot plot : world.getPlots().values()) {
+                    if (plot.isDefault() || plot.getMergedDirections().isEmpty()) {
+                        continue;
+                    }
+                    for (PlotMergeDirection direction : plot.getMergedDirections()) {
+                        stmt.setString(1, worldName);
+                        stmt.setInt(2, plot.getId().x());
+                        stmt.setInt(3, plot.getId().z());
+                        stmt.setString(4, direction.getLowerCaseName());
                         stmt.addBatch();
                     }
                 }

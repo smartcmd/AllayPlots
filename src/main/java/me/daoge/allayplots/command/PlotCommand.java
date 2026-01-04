@@ -10,6 +10,7 @@ import me.daoge.allayplots.plot.Plot;
 import me.daoge.allayplots.plot.PlotId;
 import me.daoge.allayplots.plot.PlotFlag;
 import me.daoge.allayplots.plot.PlotFlagValue;
+import me.daoge.allayplots.plot.PlotMergeDirection;
 import me.daoge.allayplots.plot.PlotService;
 import me.daoge.allayplots.plot.PlotWorld;
 import org.allaymc.api.command.Command;
@@ -28,6 +29,7 @@ import org.slf4j.Logger;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class PlotCommand extends Command {
@@ -57,6 +59,8 @@ public final class PlotCommand extends Command {
         root.key("claim").exec(this::handleClaim, SenderType.PLAYER);
         root.key("auto").exec(this::handleAuto, SenderType.PLAYER);
         root.key("delete").exec(this::handleDelete, SenderType.PLAYER);
+        root.key("merge").enumClass("direction", PlotMergeDirection.class).optional().exec(this::handleMerge, SenderType.PLAYER);
+        root.key("unmerge").enumClass("direction", PlotMergeDirection.class).optional().exec(this::handleUnmerge, SenderType.PLAYER);
         root.key("info").exec(this::handleInfo, SenderType.PLAYER);
         root.key("home").playerTarget("player").optional().exec(this::handleHomeOther, SenderType.PLAYER);
         root.key("sethome").exec(this::handleSetHome, SenderType.PLAYER);
@@ -116,6 +120,60 @@ public final class PlotCommand extends Command {
         return context.success();
     }
 
+    private CommandResult handleMerge(CommandContext context, EntityPlayer player) {
+        PlotContext plotContext = resolvePlotContext(context, player);
+        if (plotContext == null) {
+            return context.fail();
+        }
+        Plot plot = requireOwnedPlot(context, player, plotContext);
+        if (plot == null) {
+            return context.fail();
+        }
+        PlotMergeDirection direction = resolveMergeDirection(context, player);
+        PlotId targetId = plotContext.world().getAdjacentPlotId(plotContext.plotId(), direction);
+        Plot targetPlot = plotContext.world().getPlot(targetId);
+        if (targetPlot == null || !targetPlot.isClaimed()) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_TARGET_UNCLAIMED));
+            return context.fail();
+        }
+        if (!Objects.equals(plot.getOwner(), targetPlot.getOwner())) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_NOT_SAME_OWNER));
+            return context.fail();
+        }
+        if (plotContext.world().isMerged(plotContext.plotId(), direction)) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_ALREADY));
+            return context.fail();
+        }
+        if (!plotContext.world().setMerged(plotContext.plotId(), direction, true)) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_FAILED));
+            return context.fail();
+        }
+        plotService.syncPlotSettings(plotContext.world(), plotContext.plotId(), plot);
+        plotService.updateMergeRoads(plotContext.world(), plotContext.plotId(), direction);
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_SUCCESS, targetId.x(), targetId.z()));
+        return context.success();
+    }
+
+    private CommandResult handleUnmerge(CommandContext context, EntityPlayer player) {
+        PlotContext plotContext = resolvePlotContext(context, player);
+        if (plotContext == null) {
+            return context.fail();
+        }
+        if (requireOwnedPlot(context, player, plotContext) == null) {
+            return context.fail();
+        }
+        PlotMergeDirection direction = resolveMergeDirection(context, player);
+        if (!plotContext.world().isMerged(plotContext.plotId(), direction)) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_NOT_MERGED));
+            return context.fail();
+        }
+        plotContext.world().setMerged(plotContext.plotId(), direction, false);
+        plotService.updateMergeRoads(plotContext.world(), plotContext.plotId(), direction);
+        PlotId targetId = plotContext.world().getAdjacentPlotId(plotContext.plotId(), direction);
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_SUCCESS, targetId.x(), targetId.z()));
+        return context.success();
+    }
+
     private CommandResult handleInfo(CommandContext context, EntityPlayer player) {
         PlotContext plotContext = resolvePlotContext(context, player);
         if (plotContext == null) {
@@ -166,8 +224,7 @@ public final class PlotCommand extends Command {
         if (plotContext == null) {
             return context.fail();
         }
-        Plot plot = requireOwnedPlot(context, player, plotContext);
-        if (plot == null) {
+        if (requireOwnedPlot(context, player, plotContext) == null) {
             return context.fail();
         }
         plotService.setHomePlot(player.getUniqueId(), plotContext.world(), plotContext.plotId());
@@ -186,10 +243,11 @@ public final class PlotCommand extends Command {
         if (plotTarget == null) {
             return context.fail();
         }
-        Plot plot = plotTarget.plot();
         EntityPlayer target = plotTarget.target();
-        plot.addTrusted(target.getUniqueId());
-        plot.getDenied().remove(target.getUniqueId());
+        plotService.applyToMergeGroup(plotTarget.world(), plotTarget.plotId(), plot -> {
+            plot.addTrusted(target.getUniqueId());
+            plot.getDenied().remove(target.getUniqueId());
+        });
         context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_ADDED, target.getDisplayName()));
         return context.success();
     }
@@ -199,9 +257,10 @@ public final class PlotCommand extends Command {
         if (plotTarget == null) {
             return context.fail();
         }
-        Plot plot = plotTarget.plot();
         EntityPlayer target = plotTarget.target();
-        plot.removeTrusted(target.getUniqueId());
+        plotService.applyToMergeGroup(plotTarget.world(), plotTarget.plotId(), plot -> {
+            plot.removeTrusted(target.getUniqueId());
+        });
         context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_REMOVED, target.getDisplayName()));
         return context.success();
     }
@@ -211,10 +270,11 @@ public final class PlotCommand extends Command {
         if (plotTarget == null) {
             return context.fail();
         }
-        Plot plot = plotTarget.plot();
         EntityPlayer target = plotTarget.target();
-        plot.addDenied(target.getUniqueId());
-        plot.getTrusted().remove(target.getUniqueId());
+        plotService.applyToMergeGroup(plotTarget.world(), plotTarget.plotId(), plot -> {
+            plot.addDenied(target.getUniqueId());
+            plot.getTrusted().remove(target.getUniqueId());
+        });
         context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_ADDED, target.getDisplayName()));
         return context.success();
     }
@@ -224,9 +284,10 @@ public final class PlotCommand extends Command {
         if (plotTarget == null) {
             return context.fail();
         }
-        Plot plot = plotTarget.plot();
         EntityPlayer target = plotTarget.target();
-        plot.removeDenied(target.getUniqueId());
+        plotService.applyToMergeGroup(plotTarget.world(), plotTarget.plotId(), plot -> {
+            plot.removeDenied(target.getUniqueId());
+        });
         context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_REMOVED, target.getDisplayName()));
         return context.success();
     }
@@ -270,14 +331,14 @@ public final class PlotCommand extends Command {
         if (plotContext == null) {
             return context.fail();
         }
-        Plot plot = requireOwnedPlot(context, player, plotContext);
-        if (plot == null) {
+        if (requireOwnedPlot(context, player, plotContext) == null) {
             return context.fail();
         }
         PlotFlag flag = context.getResult(1);
         String rawValue = context.getResult(2);
         if (PlotFlagValue.isReset(rawValue)) {
-            plot.removeFlag(flag.getLowerCaseName());
+            plotService.applyToMergeGroup(plotContext.world(), plotContext.plotId(),
+                    target -> target.removeFlag(flag.getLowerCaseName()));
             context.addOutput(messages.render(
                     player,
                     LangKeys.MESSAGE_FLAG_RESET,
@@ -291,7 +352,8 @@ public final class PlotCommand extends Command {
             context.addOutput(messages.render(player, LangKeys.MESSAGE_FLAG_INVALID_VALUE));
             return context.fail();
         }
-        plot.setFlag(flag, parsed);
+        plotService.applyToMergeGroup(plotContext.world(), plotContext.plotId(),
+                target -> target.setFlag(flag, parsed));
         context.addOutput(messages.render(
                 player,
                 LangKeys.MESSAGE_FLAG_SET,
@@ -369,7 +431,15 @@ public final class PlotCommand extends Command {
         if (target == null) {
             return null;
         }
-        return new PlotTarget(plot, target);
+        return new PlotTarget(plotContext.world(), plotContext.plotId(), plot, target);
+    }
+
+    private PlotMergeDirection resolveMergeDirection(CommandContext context, EntityPlayer player) {
+        PlotMergeDirection direction = context.getResult(1);
+        if (direction != null) {
+            return direction;
+        }
+        return PlotMergeDirection.fromYaw(player.getLocation().yaw());
     }
 
     private CommandResult handleClaim(CommandContext context, EntityPlayer player, PlotContext plotContext, boolean auto) {
@@ -472,9 +542,9 @@ public final class PlotCommand extends Command {
     }
 
     private void teleportToPlot(EntityPlayer player, PlotWorld world, PlotId plotId) {
-        var bounds = world.getPlotBounds(plotId);
-        double x = bounds.minX() + (world.getConfig().plotSize() / 2.0);
-        double z = bounds.minZ() + (world.getConfig().plotSize() / 2.0);
+        var bounds = world.getMergedPlotBounds(plotId);
+        double x = bounds.minX() + ((bounds.maxX() - bounds.minX() + 1) / 2.0);
+        double z = bounds.minZ() + ((bounds.maxZ() - bounds.minZ() + 1) / 2.0);
         double y = world.getConfig().groundY() + 1.0;
         var targetWorld = Server.getInstance().getWorldPool().getWorld(world.getConfig().worldName());
         var dimension = targetWorld != null ? targetWorld.getOverWorld() : player.getDimension();
@@ -488,7 +558,7 @@ public final class PlotCommand extends Command {
         ));
     }
 
-    private record PlotTarget(Plot plot, EntityPlayer target) {
+    private record PlotTarget(PlotWorld world, PlotId plotId, Plot plot, EntityPlayer target) {
     }
 
     private record PlotContext(PlotWorld world, PlotId plotId, Plot plot) {

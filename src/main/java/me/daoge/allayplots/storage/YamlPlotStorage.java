@@ -2,6 +2,7 @@ package me.daoge.allayplots.storage;
 
 import me.daoge.allayplots.plot.Plot;
 import me.daoge.allayplots.plot.PlotId;
+import me.daoge.allayplots.plot.PlotMergeDirection;
 import me.daoge.allayplots.plot.PlotWorld;
 import org.allaymc.api.utils.config.Config;
 import org.allaymc.api.utils.config.ConfigSection;
@@ -89,6 +90,15 @@ public final class YamlPlotStorage implements PlotStorage {
                     }
                 }
 
+                for (String raw : plotSection.getStringList("merged")) {
+                    PlotMergeDirection direction = PlotMergeDirection.fromString(raw);
+                    if (direction != null) {
+                        plot.addMergedDirection(direction);
+                    } else if (raw != null && !raw.isBlank()) {
+                        logger.warn("Invalid merged direction {} for plot {} in {}", raw, plotKey, worldName);
+                    }
+                }
+
                 if (!plot.isDefault()) {
                     plots.put(id, plot);
                 }
@@ -144,6 +154,13 @@ public final class YamlPlotStorage implements PlotStorage {
                     if (!flagsSection.isEmpty()) {
                         plotSection.set("flags", flagsSection);
                     }
+                }
+                if (!plot.getMergedDirections().isEmpty()) {
+                    List<String> merged = new ArrayList<>(plot.getMergedDirections().size());
+                    for (PlotMergeDirection direction : plot.getMergedDirections()) {
+                        merged.add(direction.getLowerCaseName());
+                    }
+                    plotSection.set("merged", merged);
                 }
                 plotsSection.set(plot.getId().asString(), plotSection);
             }

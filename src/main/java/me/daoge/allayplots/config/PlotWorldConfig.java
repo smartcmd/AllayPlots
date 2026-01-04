@@ -53,6 +53,9 @@ public final class PlotWorldConfig extends OkaeriConfig {
         }
     }
 
+    /**
+     * Size of one cell in blocks: plot + road.
+     */
     public int totalSize() {
         return plotSize + roadSize;
     }

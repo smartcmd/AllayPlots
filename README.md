@@ -7,7 +7,7 @@ handling with EconomyAPI integration.
 
 - Plot claim, delete, and info queries
 - Trust/deny access control
-- Plot home and plot flags
+- Plot home, flags, and merge/unmerge
 - Enter/leave/claim plot events
 - Plot protection for building and interactions
 - EconomyAPI integration for claim/refund pricing
@@ -23,6 +23,8 @@ handling with EconomyAPI integration.
 - `/plot claim` - Claim the plot you are standing in
 - `/plot auto` - Find and claim the next free plot
 - `/plot delete` - Delete the current plot (owner only)
+- `/plot merge [direction]` - Merge the plot with the adjacent plot you face (or direction)
+- `/plot unmerge [direction]` - Unmerge the plot from the adjacent plot you face (or direction)
 - `/plot info` - Show information about the current plot
 - `/plot home [player]` - Teleport to your plot home (or another player's)
 - `/plot sethome` - Set your plot home to the current plot
@@ -31,6 +33,8 @@ handling with EconomyAPI integration.
 - `/plot deny <player>` - Deny a player on your plot
 - `/plot undeny <player>` - Remove a denied player
 - `/plot flag [flag] [value]` - List, view, or set plot flags
+
+Directions: `north`, `east`, `south`, `west` (defaults to your facing direction).
 
 Supported flags:
 

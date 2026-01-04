@@ -1,6 +1,5 @@
 package me.daoge.allayplots.i18n;
 
-import me.daoge.allayplots.config.PluginConfig;
 import org.allaymc.api.entity.interfaces.EntityPlayer;
 import org.allaymc.api.message.I18n;
 import org.allaymc.api.message.LangCode;
@@ -8,11 +7,9 @@ import org.allaymc.api.utils.TextFormat;
 import org.allaymc.papi.PlaceholderAPI;
 
 public final class MessageService {
-    private final PluginConfig config;
     private final PlaceholderAPI placeholderApi;
 
-    public MessageService(PluginConfig config) {
-        this.config = config;
+    public MessageService() {
         this.placeholderApi = PlaceholderAPI.getAPI();
     }
 
@@ -27,7 +24,7 @@ public final class MessageService {
     private String render(EntityPlayer player, boolean includePrefix, String template, Object... args) {
         String message = translate(player, template, args);
         if (includePrefix) {
-            message = translate(player, config.messages().prefix()) + message;
+            message = translate(player, LangKeys.MESSAGE_PREFIX) + message;
         }
         message = applyPlaceholders(player, message);
         return TextFormat.colorize(message);

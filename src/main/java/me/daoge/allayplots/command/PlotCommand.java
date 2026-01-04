@@ -97,7 +97,7 @@ public final class PlotCommand extends Command {
     private CommandResult handleAuto(CommandContext context, EntityPlayer player) {
         PlotWorld world = plotService.getPlotWorld(player.getDimension());
         if (world == null) {
-            context.addOutput(messages.render(player, config.messages().notPlotWorld()));
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_PLOT_WORLD));
             return context.fail();
         }
         PlotId nextId = plotService.findNextFreePlotId(world);
@@ -112,11 +112,11 @@ public final class PlotCommand extends Command {
         }
         Plot plot = plotContext.plot();
         if (plot == null || !plot.isClaimed()) {
-            context.addOutput(messages.render(player, config.messages().plotUnclaimed()));
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
             return context.fail();
         }
         if (!plot.isOwner(player.getUniqueId()) && !player.hasPermission(Permissions.ADMIN_DELETE).asBoolean()) {
-            context.addOutput(messages.render(player, config.messages().notOwner()));
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
             return context.fail();
         }
 
@@ -129,7 +129,7 @@ public final class PlotCommand extends Command {
         }
 
         plotService.deletePlot(plotContext.world(), plotContext.plotId());
-        context.addOutput(messages.render(player, config.messages().deleteSuccess()));
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_DELETE_SUCCESS));
         return context.success();
     }
 
@@ -139,10 +139,10 @@ public final class PlotCommand extends Command {
             return context.fail();
         }
         Plot plot = plotContext.plot();
-        String ownerText = messages.renderInline(player, config.messages().unclaimedInfo());
+        String ownerText = messages.renderInline(player, LangKeys.MESSAGE_UNCLAIMED_INFO);
         if (plot != null && plot.isClaimed()) {
             String ownerName = plotService.resolvePlayerName(plot.getOwner());
-            ownerText = messages.renderInline(player, config.messages().claimedInfo(), ownerName);
+            ownerText = messages.renderInline(player, LangKeys.MESSAGE_CLAIMED_INFO, ownerName);
         }
         context.addOutput(messages.renderInline(
                 player,
@@ -175,7 +175,7 @@ public final class PlotCommand extends Command {
         }
         plot.addTrusted(target.getUniqueId());
         plot.getDenied().remove(target.getUniqueId());
-        context.addOutput(messages.render(player, config.messages().trustAdded(), target.getDisplayName()));
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_ADDED, target.getDisplayName()));
         return context.success();
     }
 
@@ -193,7 +193,7 @@ public final class PlotCommand extends Command {
             return context.fail();
         }
         plot.removeTrusted(target.getUniqueId());
-        context.addOutput(messages.render(player, config.messages().trustRemoved(), target.getDisplayName()));
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_REMOVED, target.getDisplayName()));
         return context.success();
     }
 
@@ -212,7 +212,7 @@ public final class PlotCommand extends Command {
         }
         plot.addDenied(target.getUniqueId());
         plot.getTrusted().remove(target.getUniqueId());
-        context.addOutput(messages.render(player, config.messages().denyAdded(), target.getDisplayName()));
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_ADDED, target.getDisplayName()));
         return context.success();
     }
 
@@ -230,21 +230,21 @@ public final class PlotCommand extends Command {
             return context.fail();
         }
         plot.removeDenied(target.getUniqueId());
-        context.addOutput(messages.render(player, config.messages().denyRemoved(), target.getDisplayName()));
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_REMOVED, target.getDisplayName()));
         return context.success();
     }
 
     private PlotContext resolvePlotContext(CommandContext context, EntityPlayer player) {
         PlotWorld world = plotService.getPlotWorld(player.getDimension());
         if (world == null) {
-            context.addOutput(messages.render(player, config.messages().notPlotWorld()));
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_PLOT_WORLD));
             return null;
         }
         int x = (int) Math.floor(player.getLocation().x());
         int z = (int) Math.floor(player.getLocation().z());
         PlotId plotId = world.getPlotIdAt(x, z);
         if (plotId == null) {
-            context.addOutput(messages.render(player, config.messages().notInPlot()));
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_IN_PLOT));
             return null;
         }
         return new PlotContext(world, plotId, world.getPlot(plotId));
@@ -253,11 +253,11 @@ public final class PlotCommand extends Command {
     private Plot requireOwnedPlot(CommandContext context, EntityPlayer player, PlotContext plotContext) {
         Plot plot = plotContext.plot();
         if (plot == null || !plot.isClaimed()) {
-            context.addOutput(messages.render(player, config.messages().plotUnclaimed()));
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
             return null;
         }
         if (!plot.isOwner(player.getUniqueId()) && !player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
-            context.addOutput(messages.render(player, config.messages().notOwner()));
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
             return null;
         }
         return plot;
@@ -280,7 +280,7 @@ public final class PlotCommand extends Command {
     private CommandResult handleClaim(CommandContext context, EntityPlayer player, PlotContext plotContext) {
         Plot plot = plotContext.plot();
         if (plot != null && plot.isClaimed()) {
-            context.addOutput(messages.render(player, config.messages().alreadyClaimed()));
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_ALREADY_CLAIMED));
             return context.fail();
         }
 
@@ -289,7 +289,7 @@ public final class PlotCommand extends Command {
         if (maxPlots > 0) {
             int owned = plotService.countOwnedPlots(plotContext.world(), player.getUniqueId());
             if (owned >= maxPlots) {
-                context.addOutput(messages.render(player, config.messages().tooManyPlots(), String.valueOf(maxPlots)));
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_TOO_MANY_PLOTS, String.valueOf(maxPlots)));
                 return context.fail();
             }
         }
@@ -299,7 +299,7 @@ public final class PlotCommand extends Command {
                 && !player.hasPermission(Permissions.ECONOMY_BYPASS).asBoolean()) {
             BigDecimal price = BigDecimal.valueOf(worldConfig.claimPrice());
             if (!withdraw(player.getUniqueId(), price)) {
-                context.addOutput(messages.render(player, config.messages().notEnoughMoney(), price.toPlainString()));
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_ENOUGH_MONEY, price.toPlainString()));
                 return context.fail();
             }
         }
@@ -312,7 +312,7 @@ public final class PlotCommand extends Command {
         if (worldConfig.teleportOnClaim()) {
             teleportToPlot(player, plotContext.world(), plotContext.plotId());
         }
-        context.addOutput(messages.render(player, config.messages().claimSuccess()));
+        context.addOutput(messages.render(player, LangKeys.MESSAGE_CLAIM_SUCCESS));
         return context.success();
     }
 

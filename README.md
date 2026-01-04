@@ -31,7 +31,7 @@ handling with EconomyAPI integration.
 ## ⚙️ Configuration
 
 Config file is created at `plugins/AllayPlots/config.yml`. A full example is available in `config.yml`.
-All keys use hyphen style. Message entries are i18n keys (snake_case).
+All keys use hyphen style. Messages are fixed to i18n keys and are not configurable.
 
 ```yaml
 worlds:

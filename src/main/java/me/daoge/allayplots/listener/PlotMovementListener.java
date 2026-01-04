@@ -4,6 +4,7 @@ import me.daoge.allayplots.Permissions;
 import me.daoge.allayplots.config.PluginConfig;
 import me.daoge.allayplots.event.PlotEnterEvent;
 import me.daoge.allayplots.event.PlotLeaveEvent;
+import me.daoge.allayplots.i18n.LangKeys;
 import me.daoge.allayplots.i18n.MessageService;
 import me.daoge.allayplots.plot.Plot;
 import me.daoge.allayplots.plot.PlotId;
@@ -52,7 +53,7 @@ public final class PlotMovementListener {
 
         if (toPlot != null && isDenied(player, toPlot.plot()) && !player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
             event.setCancelled(true);
-            sendMessage(player, messages.render(player, config.messages().enterDenied()));
+            sendMessage(player, messages.render(player, LangKeys.MESSAGE_ENTER_DENIED));
             return;
         }
 
@@ -79,14 +80,14 @@ public final class PlotMovementListener {
     }
 
     private String renderEnterMessage(EntityPlayer player, PlotWorld world, PlotId plotId, Plot plot) {
-        String ownerInfo = messages.renderInline(player, config.messages().unclaimedInfo());
+        String ownerInfo = messages.renderInline(player, LangKeys.MESSAGE_UNCLAIMED_INFO);
         if (plot != null && plot.isClaimed()) {
             String ownerName = plotService.resolvePlayerName(plot.getOwner());
-            ownerInfo = messages.renderInline(player, config.messages().claimedInfo(), ownerName);
+            ownerInfo = messages.renderInline(player, LangKeys.MESSAGE_CLAIMED_INFO, ownerName);
         }
         return messages.render(
                 player,
-                config.messages().enter(),
+                LangKeys.MESSAGE_ENTER,
                 plotId.x(),
                 plotId.z(),
                 ownerInfo,
@@ -95,7 +96,7 @@ public final class PlotMovementListener {
     }
 
     private String renderLeaveMessage(EntityPlayer player, PlotId plotId) {
-        return messages.render(player, config.messages().leave(), plotId.x(), plotId.z());
+        return messages.render(player, LangKeys.MESSAGE_LEAVE, plotId.x(), plotId.z());
     }
 
     private void sendMessage(EntityPlayer player, String message) {

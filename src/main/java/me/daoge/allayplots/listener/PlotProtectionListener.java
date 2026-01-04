@@ -2,6 +2,7 @@ package me.daoge.allayplots.listener;
 
 import me.daoge.allayplots.Permissions;
 import me.daoge.allayplots.config.PluginConfig;
+import me.daoge.allayplots.i18n.LangKeys;
 import me.daoge.allayplots.i18n.MessageService;
 import me.daoge.allayplots.plot.Plot;
 import me.daoge.allayplots.plot.PlotId;
@@ -101,14 +102,14 @@ public final class PlotProtectionListener {
         PlotId id = world.getPlotIdAt(x, z);
         if (id == null) {
             if (config.protectRoads()) {
-                player.sendMessage(messages.render(player, config.messages().buildDenied()));
+                player.sendMessage(messages.render(player, LangKeys.MESSAGE_BUILD_DENIED));
                 return true;
             }
             return false;
         }
         Plot plot = world.getPlot(id);
         if (plot == null || !plot.canBuild(player.getUniqueId())) {
-            player.sendMessage(messages.render(player, config.messages().buildDenied()));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_BUILD_DENIED));
             return true;
         }
         return false;

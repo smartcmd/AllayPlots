@@ -42,7 +42,7 @@ public final class AllayPlotsPlugin extends Plugin {
         plotStorage = new YamlPlotStorage(dataFolder, getPluginLogger());
         plotService = new PlotService(config, plotStorage, getPluginLogger());
         plotService.load();
-        messageService = new MessageService(config);
+        messageService = new MessageService();
 
         ensurePlotWorldsLoaded();
 

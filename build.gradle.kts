@@ -34,5 +34,7 @@ dependencies {
     compileOnly(group = "org.allaymc", name = "economy-api", version = "0.2.2")
     compileOnly(group = "org.allaymc", name = "papi", version = "0.2.0")
     implementation(group = "eu.okaeri", name = "okaeri-configs-yaml-snakeyaml", version = "5.0.13")
+    implementation(group = "org.xerial", name = "sqlite-jdbc", version = "3.47.1.0")
+    implementation(group = "com.h2database", name = "h2", version = "2.4.240")
     annotationProcessor(group = "org.projectlombok", name = "lombok", version = "1.18.34")
 }

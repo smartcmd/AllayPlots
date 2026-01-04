@@ -60,14 +60,16 @@ public final class PlotDamageListener {
     }
 
     private EntityPlayer resolveAttackingPlayer(EntityDamageEvent event) {
-        Object attacker = event.getDamageContainer().getAttacker();
-        if (attacker instanceof EntityPlayer player) {
-            return player;
-        }
-        if (attacker instanceof EntityProjectile projectile) {
-            Entity shooter = projectile.getShooter();
-            if (shooter instanceof EntityPlayer player) {
+        switch (event.getDamageContainer().getAttacker()) {
+            case EntityPlayer player -> {
                 return player;
+            }
+            case EntityProjectile projectile -> {
+                if (projectile.getShooter() instanceof EntityPlayer player) {
+                    return player;
+                }
+            }
+            case null, default -> {
             }
         }
         return null;

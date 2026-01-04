@@ -186,8 +186,7 @@ public final class PlotCommand extends Command {
 
         String ownerLine = messages.renderInline(player, LangKeys.MESSAGE_UNCLAIMED_INFO);
         if (plot != null && plot.isClaimed()) {
-            String ownerName = plotService.resolvePlayerName(plot.getOwner());
-            ownerLine = messages.renderInline(player, LangKeys.MESSAGE_CLAIMED_INFO, ownerName);
+            ownerLine = messages.renderInline(player, LangKeys.MESSAGE_CLAIMED_INFO, plot.getOwnerNameOrUUID());
         }
 
         context.addOutput(messages.renderInline(

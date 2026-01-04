@@ -8,7 +8,6 @@ import org.allaymc.api.block.type.BlockState;
 import org.allaymc.api.block.type.BlockTypes;
 import org.allaymc.api.math.MathUtils;
 import org.allaymc.api.math.location.Location3dc;
-import org.allaymc.api.player.Player;
 import org.allaymc.api.registry.Registries;
 import org.allaymc.api.server.Server;
 import org.allaymc.api.utils.identifier.Identifier;
@@ -16,9 +15,7 @@ import org.allaymc.api.world.Dimension;
 import org.slf4j.Logger;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -28,8 +25,6 @@ public final class PlotService {
     private final Logger logger;
 
     private final Map<String, PlotWorld> worlds = new HashMap<>();
-    private final Map<UUID, String> ownerNames = new HashMap<>();
-    private final Set<UUID> ownerNameSynced = new HashSet<>();
 
     public PlotService(PluginConfig config, PlotStorage storage, Logger logger) {
         this.config = config;
@@ -45,9 +40,6 @@ public final class PlotService {
             Map<PlotId, Plot> worldPlots = stored.get(entry.getKey());
             if (worldPlots != null) {
                 world.getPlots().putAll(worldPlots);
-                for (Plot plot : worldPlots.values()) {
-                    cacheOwnerName(plot);
-                }
                 world.normalizeMerges();
             }
 
@@ -60,7 +52,7 @@ public final class PlotService {
     }
 
     public void save() {
-        storage.save(new HashMap<>(worlds));
+        storage.save(snapshotWorlds());
     }
 
     public int worldCount() {
@@ -98,9 +90,7 @@ public final class PlotService {
     }
 
     public Plot claimPlot(PlotWorld world, PlotId id, UUID owner, String ownerName) {
-        Plot plot = world.claimPlot(id, owner, ownerName);
-        cacheOwnerName(plot);
-        return plot;
+        return world.claimPlot(id, owner, ownerName);
     }
 
     public void deletePlot(PlotWorld world, PlotId id) {
@@ -146,20 +136,6 @@ public final class PlotService {
 
         plot.setHome(true);
         return true;
-    }
-
-    public String resolvePlayerName(UUID uuid) {
-        if (uuid == null) return "";
-
-        Player player = Server.getInstance().getPlayerManager().getPlayers().get(uuid);
-        if (player == null) {
-            return ownerNames.getOrDefault(uuid, uuid.toString());
-        }
-
-        String name = player.getOriginName();
-        ownerNames.put(uuid, name);
-        syncOwnerName(uuid, name);
-        return name;
     }
 
     public Map<String, PlotWorld> snapshotWorlds() {
@@ -367,28 +343,6 @@ public final class PlotService {
             BlockState air = BlockTypes.AIR.getDefaultState();
 
             return new PlotSurfacePalette(plotBlock, roadBlock, roadEdgeBlock, roadCornerBlock, air);
-        }
-    }
-
-    private void cacheOwnerName(Plot plot) {
-        if (plot == null || plot.getOwner() == null) return;
-
-        String name = plot.getOwnerName();
-        if (name != null && !name.isBlank()) {
-            ownerNames.put(plot.getOwner(), name);
-        }
-    }
-
-    private void syncOwnerName(UUID owner, String name) {
-        if (name == null || name.isBlank() || !ownerNameSynced.add(owner)) return;
-
-        for (PlotWorld world : worlds.values()) {
-            for (Plot plot : world.getPlots().values()) {
-                if (owner.equals(plot.getOwner())
-                    && (plot.getOwnerName() == null || plot.getOwnerName().isBlank())) {
-                    plot.setOwnerName(name);
-                }
-            }
         }
     }
 }

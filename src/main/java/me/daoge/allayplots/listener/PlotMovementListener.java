@@ -82,8 +82,7 @@ public final class PlotMovementListener {
     private String renderEnterMessage(EntityPlayer player, PlotWorld world, PlotId plotId, Plot plot) {
         String ownerInfo = messages.renderInline(player, LangKeys.MESSAGE_UNCLAIMED_INFO);
         if (plot != null && plot.isClaimed()) {
-            String ownerName = plotService.resolvePlayerName(plot.getOwner());
-            ownerInfo = messages.renderInline(player, LangKeys.MESSAGE_CLAIMED_INFO, ownerName);
+            ownerInfo = messages.renderInline(player, LangKeys.MESSAGE_CLAIMED_INFO, plot.getOwnerNameOrUUID());
         }
         return messages.render(
                 player,

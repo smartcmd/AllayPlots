@@ -60,6 +60,10 @@ public final class Plot {
         return ownerName;
     }
 
+    public String getOwnerNameOrUUID() {
+        return ownerName != null ? ownerName : owner.toString();
+    }
+
     public void setOwnerName(String ownerName) {
         if (owner != null) {
             this.ownerName = ownerName;

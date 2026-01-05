@@ -13,6 +13,7 @@ public final class LangKeys {
     public static final String MESSAGE_NOT_PLOT_WORLD = "allayplots:message.not_plot_world";
     public static final String MESSAGE_ALREADY_CLAIMED = "allayplots:message.already_claimed";
     public static final String MESSAGE_CLAIM_SUCCESS = "allayplots:message.claim_success";
+    public static final String MESSAGE_CLAIM_FAILED = "allayplots:message.claim_failed";
     public static final String MESSAGE_DELETE_SUCCESS = "allayplots:message.delete_success";
     public static final String MESSAGE_MERGE_SUCCESS = "allayplots:message.merge_success";
     public static final String MESSAGE_MERGE_ALREADY = "allayplots:message.merge_already";

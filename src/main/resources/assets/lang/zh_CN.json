@@ -8,6 +8,7 @@
   "allayplots:message.not_plot_world": "&c当前世界未配置地皮。",
   "allayplots:message.already_claimed": "&c该地皮已被认领。",
   "allayplots:message.claim_success": "&a已成功认领地皮。",
+  "allayplots:message.claim_failed": "&c地皮认领失败。",
   "allayplots:message.delete_success": "&a地皮已删除。",
   "allayplots:message.merge_success": "&a已合并到地皮 &e(%1, %2)&a。",
   "allayplots:message.merge_already": "&c该方向的地皮已合并。",

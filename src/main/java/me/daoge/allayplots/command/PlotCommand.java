@@ -104,22 +104,25 @@ public final class PlotCommand extends Command {
     }
 
     private CommandResult handleDelete(CommandContext context, EntityPlayer player) {
-        PlotContext pc = resolveClaimedPlotContext(context, player);
+        PlotContext pc = resolvePlotContext(context, player);
         if (pc == null) return context.fail();
 
-        Plot plot = pc.plot(); // guaranteed non-null & claimed by resolveClaimedPlotContext
-        if (!isOwnerOrAdminDelete(player, plot)) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
-            return context.fail();
-        }
+        Plot plot = pc.plot();
+        boolean bypass = player.hasPermission(Permissions.ADMIN_DELETE).asBoolean();
+        PlotService.OwnerActionResult result = plotService.deletePlot(
+                pc.world(),
+                pc.plotId(),
+                player.getUniqueId(),
+                bypass
+        );
+        if (!handleOwnerResult(context, player, result)) return context.fail();
 
         PlotWorldConfig wc = pc.world().getConfig();
-        if (shouldRefundOnDelete(player, wc)) {
+        if (plot != null && shouldRefundOnDelete(player, wc)) {
             UUID receiver = plot.getOwner() != null ? plot.getOwner() : player.getUniqueId();
             deposit(receiver, BigDecimal.valueOf(wc.sellRefund()));
         }
 
-        plotService.deletePlot(pc.world(), pc.plotId());
         context.addOutput(messages.render(player, LangKeys.MESSAGE_DELETE_SUCCESS));
         return context.success();
     }
@@ -128,16 +131,29 @@ public final class PlotCommand extends Command {
         PlotContext pc = resolvePlotContext(context, player);
         if (pc == null) return context.fail();
 
-        if (requireOwnedPlot(context, player, pc) == null) return context.fail();
-
         PlotMergeDirection dir = resolveMergeDirection(context, player);
         PlotId targetId = pc.world().getAdjacentPlotId(pc.plotId(), dir);
 
-        PlotService.MergeResult result = plotService.mergePlots(pc.world(), pc.plotId(), dir);
+        boolean bypass = player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean();
+        PlotService.MergeResult result = plotService.mergePlots(
+                pc.world(),
+                pc.plotId(),
+                dir,
+                player.getUniqueId(),
+                bypass
+        );
         return switch (result) {
             case SUCCESS -> {
                 context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_SUCCESS, targetId.x(), targetId.z()));
                 yield context.success();
+            }
+            case UNCLAIMED -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+                yield context.fail();
+            }
+            case NOT_OWNER -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
+                yield context.fail();
             }
             case TARGET_UNCLAIMED -> {
                 context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_TARGET_UNCLAIMED));
@@ -162,12 +178,34 @@ public final class PlotCommand extends Command {
         PlotContext pc = resolvePlotContext(context, player);
         if (pc == null) return context.fail();
 
-        if (requireOwnedPlot(context, player, pc) == null) return context.fail();
-
         PlotMergeDirection dir = resolveMergeDirection(context, player);
-        if (!plotService.unmergePlots(pc.world(), pc.plotId(), dir)) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_NOT_MERGED));
-            return context.fail();
+        boolean bypass = player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean();
+        PlotService.UnmergeResult result = plotService.unmergePlots(
+                pc.world(),
+                pc.plotId(),
+                dir,
+                player.getUniqueId(),
+                bypass
+        );
+        switch (result) {
+            case SUCCESS -> {
+            }
+            case NOT_MERGED -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_NOT_MERGED));
+                return context.fail();
+            }
+            case UNCLAIMED -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+                return context.fail();
+            }
+            case NOT_OWNER -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
+                return context.fail();
+            }
+            case FAILED -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_NOT_MERGED));
+                return context.fail();
+            }
         }
 
         PlotId targetId = pc.world().getAdjacentPlotId(pc.plotId(), dir);
@@ -234,9 +272,9 @@ public final class PlotCommand extends Command {
         PlotContext pc = resolvePlotContext(context, player);
         if (pc == null) return context.fail();
 
-        if (requireOwnedPlot(context, player, pc) == null) return context.fail();
+        PlotService.OwnerActionResult result = plotService.setHomePlot(player.getUniqueId(), pc.world(), pc.plotId());
+        if (!handleOwnerResult(context, player, result)) return context.fail();
 
-        plotService.setHomePlot(player.getUniqueId(), pc.world(), pc.plotId());
         context.addOutput(messages.render(
                 player,
                 LangKeys.MESSAGE_HOME_SET,
@@ -251,15 +289,19 @@ public final class PlotCommand extends Command {
         PlotContext pc = resolvePlotContext(context, player);
         if (pc == null) return context.fail();
 
-        if (requireOwnedPlot(context, player, pc) == null) return context.fail();
-
         EntityPlayer target = resolveSingleTarget(context, 1);
         if (target == null) return context.fail();
 
-        if (!plotService.setPlotOwner(pc.world(), pc.plotId(), target.getUniqueId(), resolveOwnerName(target))) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
-            return context.fail();
-        }
+        boolean bypass = player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean();
+        PlotService.OwnerActionResult result = plotService.setPlotOwner(
+                pc.world(),
+                pc.plotId(),
+                player.getUniqueId(),
+                bypass,
+                target.getUniqueId(),
+                resolveOwnerName(target)
+        );
+        if (!handleOwnerResult(context, player, result)) return context.fail();
 
         context.addOutput(messages.render(
                 player,
@@ -273,48 +315,74 @@ public final class PlotCommand extends Command {
     }
 
     private CommandResult handleTrust(CommandContext context, EntityPlayer player) {
-        PlotTarget pt = resolveOwnedPlotTarget(context, player);
+        PlotTarget pt = resolvePlotTarget(context, player);
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        plotService.updateMergeGroup(pt.world(), pt.plotId(), plot -> plot
-                .withTrustedAdded(target.getUniqueId())
-                .withDeniedRemoved(target.getUniqueId()));
+        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
+                pt.world(),
+                pt.plotId(),
+                player.getUniqueId(),
+                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+                plot -> plot.withTrustedAdded(target.getUniqueId())
+                            .withDeniedRemoved(target.getUniqueId())
+        );
+        if (!handleOwnerResult(context, player, result)) return context.fail();
 
         context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_ADDED, target.getDisplayName()));
         return context.success();
     }
 
     private CommandResult handleUntrust(CommandContext context, EntityPlayer player) {
-        PlotTarget pt = resolveOwnedPlotTarget(context, player);
+        PlotTarget pt = resolvePlotTarget(context, player);
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        plotService.updateMergeGroup(pt.world(), pt.plotId(), plot -> plot.withTrustedRemoved(target.getUniqueId()));
+        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
+                pt.world(),
+                pt.plotId(),
+                player.getUniqueId(),
+                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+                plot -> plot.withTrustedRemoved(target.getUniqueId())
+        );
+        if (!handleOwnerResult(context, player, result)) return context.fail();
 
         context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_REMOVED, target.getDisplayName()));
         return context.success();
     }
 
     private CommandResult handleDeny(CommandContext context, EntityPlayer player) {
-        PlotTarget pt = resolveOwnedPlotTarget(context, player);
+        PlotTarget pt = resolvePlotTarget(context, player);
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        plotService.updateMergeGroup(pt.world(), pt.plotId(), plot -> plot
-                .withDeniedAdded(target.getUniqueId())
-                .withTrustedRemoved(target.getUniqueId()));
+        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
+                pt.world(),
+                pt.plotId(),
+                player.getUniqueId(),
+                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+                plot -> plot.withDeniedAdded(target.getUniqueId())
+                            .withTrustedRemoved(target.getUniqueId())
+        );
+        if (!handleOwnerResult(context, player, result)) return context.fail();
 
         context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_ADDED, target.getDisplayName()));
         return context.success();
     }
 
     private CommandResult handleUndeny(CommandContext context, EntityPlayer player) {
-        PlotTarget pt = resolveOwnedPlotTarget(context, player);
+        PlotTarget pt = resolvePlotTarget(context, player);
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        plotService.updateMergeGroup(pt.world(), pt.plotId(), plot -> plot.withDeniedRemoved(target.getUniqueId()));
+        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
+                pt.world(),
+                pt.plotId(),
+                player.getUniqueId(),
+                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+                plot -> plot.withDeniedRemoved(target.getUniqueId())
+        );
+        if (!handleOwnerResult(context, player, result)) return context.fail();
 
         context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_REMOVED, target.getDisplayName()));
         return context.success();
@@ -354,10 +422,15 @@ public final class PlotCommand extends Command {
     private CommandResult handleFlagSet(CommandContext context, EntityPlayer player, PlotFlag flag, String rawValue) {
         PlotContext pc = resolvePlotContext(context, player);
         if (pc == null) return context.fail();
-        if (requireOwnedPlot(context, player, pc) == null) return context.fail();
-
         if (PlotFlagValue.isReset(rawValue)) {
-            plotService.updateMergeGroup(pc.world(), pc.plotId(), p -> p.withoutFlag(flag.getLowerCaseName()));
+            PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
+                    pc.world(),
+                    pc.plotId(),
+                    player.getUniqueId(),
+                    player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+                    p -> p.withoutFlag(flag.getLowerCaseName())
+            );
+            if (!handleOwnerResult(context, player, result)) return context.fail();
             context.addOutput(messages.render(
                     player,
                     LangKeys.MESSAGE_FLAG_RESET,
@@ -373,7 +446,14 @@ public final class PlotCommand extends Command {
             return context.fail();
         }
 
-        plotService.updateMergeGroup(pc.world(), pc.plotId(), p -> p.withFlag(flag, parsed));
+        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
+                pc.world(),
+                pc.plotId(),
+                player.getUniqueId(),
+                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+                p -> p.withFlag(flag, parsed)
+        );
+        if (!handleOwnerResult(context, player, result)) return context.fail();
         context.addOutput(messages.render(
                 player,
                 LangKeys.MESSAGE_FLAG_SET,
@@ -414,24 +494,9 @@ public final class PlotCommand extends Command {
         return pc;
     }
 
-    private Plot requireOwnedPlot(CommandContext context, EntityPlayer player, PlotContext pc) {
-        Plot plot = pc.plot();
-        if (plot == null || !plot.isClaimed()) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
-            return null;
-        }
-        if (!plot.isOwner(player.getUniqueId()) && !player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
-            return null;
-        }
-        return plot;
-    }
-
-    private PlotTarget resolveOwnedPlotTarget(CommandContext context, EntityPlayer player) {
+    private PlotTarget resolvePlotTarget(CommandContext context, EntityPlayer player) {
         PlotContext pc = resolvePlotContext(context, player);
         if (pc == null) return null;
-
-        if (requireOwnedPlot(context, player, pc) == null) return null;
 
         EntityPlayer target = resolveSingleTarget(context, 1);
         if (target == null) return null;
@@ -458,32 +523,49 @@ public final class PlotCommand extends Command {
     }
 
     private CommandResult doClaim(CommandContext context, EntityPlayer player, PlotContext pc) {
-        Plot existing = pc.plot();
-        if (existing != null && existing.isClaimed()) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_ALREADY_CLAIMED));
-            return context.fail();
-        }
-
         PlotWorldConfig wc = pc.world().getConfig();
-
         int maxPlots = wc.maxPlotsPerPlayer();
-        if (maxPlots > 0) {
-            int owned = plotService.countOwnedPlots(pc.world(), player.getUniqueId());
-            if (owned >= maxPlots) {
-                context.addOutput(messages.render(player, LangKeys.MESSAGE_TOO_MANY_PLOTS, String.valueOf(maxPlots)));
-                return context.fail();
-            }
-        }
 
+        BigDecimal price = BigDecimal.valueOf(wc.claimPrice());
+        boolean charged = false;
         if (shouldChargeOnClaim(player, wc)) {
-            BigDecimal price = BigDecimal.valueOf(wc.claimPrice());
             if (!withdraw(player.getUniqueId(), price)) {
                 context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_ENOUGH_MONEY, price.toPlainString()));
                 return context.fail();
             }
+            charged = true;
         }
 
-        Plot claimed = plotService.claimPlot(pc.world(), pc.plotId(), player.getUniqueId(), resolveOwnerName(player));
+        PlotService.ClaimResult result = plotService.claimPlot(
+                pc.world(),
+                pc.plotId(),
+                player.getUniqueId(),
+                resolveOwnerName(player),
+                maxPlots
+        );
+        if (result != PlotService.ClaimResult.SUCCESS) {
+            if (charged) {
+                deposit(player.getUniqueId(), price);
+            }
+            switch (result) {
+                case ALREADY_CLAIMED -> context.addOutput(messages.render(player, LangKeys.MESSAGE_ALREADY_CLAIMED));
+                case TOO_MANY -> context.addOutput(messages.render(
+                        player,
+                        LangKeys.MESSAGE_TOO_MANY_PLOTS,
+                        String.valueOf(maxPlots)
+                ));
+                case FAILED -> context.addOutput(messages.render(player, LangKeys.MESSAGE_CLAIM_FAILED));
+                case SUCCESS -> {
+                }
+            }
+            return context.fail();
+        }
+
+        Plot claimed = pc.world().getPlot(pc.plotId());
+        if (claimed == null) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_CLAIM_FAILED));
+            return context.fail();
+        }
 
         new PlotClaimEvent(player, pc.world(), claimed).call();
 
@@ -579,8 +661,14 @@ public final class PlotCommand extends Command {
         ));
     }
 
-    private boolean isOwnerOrAdminDelete(EntityPlayer player, Plot plot) {
-        return plot.isOwner(player.getUniqueId()) || player.hasPermission(Permissions.ADMIN_DELETE).asBoolean();
+    private boolean handleOwnerResult(CommandContext context, EntityPlayer player, PlotService.OwnerActionResult result) {
+        if (result == PlotService.OwnerActionResult.SUCCESS) return true;
+        if (result == PlotService.OwnerActionResult.UNCLAIMED) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+        } else {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
+        }
+        return false;
     }
 
     private String renderFlags(Plot plot) {

@@ -43,7 +43,7 @@ public final class PlotService {
 
     public void start() {
         if (running.compareAndSet(false, true)) {
-            serviceThread = Thread.ofVirtual()
+            serviceThread = Thread.ofPlatform()
                     .name("AllayPlots-PlotService")
                     .start(this::runLoop);
         }
@@ -221,11 +221,47 @@ public final class PlotService {
         return new PlotLocation(world, id);
     }
 
-    public Plot claimPlot(PlotWorld world, PlotId id, UUID owner, String ownerName) {
-        return runOnPlotThread(() -> claimPlotInternal(world, id, owner, ownerName));
+    public enum ClaimResult {
+        SUCCESS,
+        ALREADY_CLAIMED,
+        TOO_MANY,
+        FAILED
     }
 
-    private Plot claimPlotInternal(PlotWorld world, PlotId id, UUID owner, String ownerName) {
+    public enum OwnerActionResult {
+        SUCCESS,
+        UNCLAIMED,
+        NOT_OWNER
+    }
+
+    public enum UnmergeResult {
+        SUCCESS,
+        NOT_MERGED,
+        UNCLAIMED,
+        NOT_OWNER,
+        FAILED
+    }
+
+    public ClaimResult claimPlot(PlotWorld world, PlotId id, UUID owner, String ownerName, int maxPlots) {
+        return runOnPlotThread(() -> claimPlotInternal(world, id, owner, ownerName, maxPlots));
+    }
+
+    private ClaimResult claimPlotInternal(PlotWorld world, PlotId id, UUID owner, String ownerName, int maxPlots) {
+        if (world == null || id == null || owner == null) {
+            return ClaimResult.FAILED;
+        }
+        Plot existing = world.getPlot(id);
+        if (existing != null && existing.isClaimed()) {
+            return ClaimResult.ALREADY_CLAIMED;
+        }
+        if (maxPlots > 0 && world.countOwnedPlots(owner) >= maxPlots) {
+            return ClaimResult.TOO_MANY;
+        }
+        claimPlotUnchecked(world, id, owner, ownerName);
+        return ClaimResult.SUCCESS;
+    }
+
+    private Plot claimPlotUnchecked(PlotWorld world, PlotId id, UUID owner, String ownerName) {
         Plot plot = world.claimPlot(id, owner, ownerName);
 
         PlotLocation loc = new PlotLocation(world, id);
@@ -239,14 +275,36 @@ public final class PlotService {
         return plot;
     }
 
-    public void deletePlot(PlotWorld world, PlotId id) {
-        runOnPlotThread(() -> {
-            deletePlotInternal(world, id);
-            return null;
-        });
+    private record OwnerCheck(OwnerActionResult result, Plot plot) {}
+
+    private OwnerCheck checkOwnedPlot(PlotWorld world, PlotId id, UUID requester, boolean bypassOwner) {
+        if (world == null || id == null) {
+            return new OwnerCheck(OwnerActionResult.UNCLAIMED, null);
+        }
+        Plot plot = world.getPlot(id);
+        if (plot == null || !plot.isClaimed()) {
+            return new OwnerCheck(OwnerActionResult.UNCLAIMED, plot);
+        }
+        if (!bypassOwner && (requester == null || !plot.isOwner(requester))) {
+            return new OwnerCheck(OwnerActionResult.NOT_OWNER, plot);
+        }
+        return new OwnerCheck(OwnerActionResult.SUCCESS, plot);
     }
 
-    private void deletePlotInternal(PlotWorld world, PlotId id) {
+    public OwnerActionResult deletePlot(PlotWorld world, PlotId id, UUID requester, boolean bypassOwner) {
+        return runOnPlotThread(() -> deletePlotInternal(world, id, requester, bypassOwner));
+    }
+
+    private OwnerActionResult deletePlotInternal(PlotWorld world, PlotId id, UUID requester, boolean bypassOwner) {
+        OwnerCheck check = checkOwnedPlot(world, id, requester, bypassOwner);
+        if (check.result != OwnerActionResult.SUCCESS) {
+            return check.result;
+        }
+        deletePlotUnchecked(world, id);
+        return OwnerActionResult.SUCCESS;
+    }
+
+    private void deletePlotUnchecked(PlotWorld world, PlotId id) {
         Plot removed = world.getPlot(id);
         Set<PlotMergeDirection> mergedDirections = removed != null
                 ? Set.copyOf(removed.getMergedDirections())
@@ -283,13 +341,16 @@ public final class PlotService {
         return homeByOwner.get(owner);
     }
 
-    public boolean setHomePlot(UUID owner, PlotWorld world, PlotId id) {
+    public OwnerActionResult setHomePlot(UUID owner, PlotWorld world, PlotId id) {
         return runOnPlotThread(() -> setHomePlotInternal(owner, world, id));
     }
 
-    private boolean setHomePlotInternal(UUID owner, PlotWorld world, PlotId id) {
-        Plot plot = world.getPlot(id);
-        if (plot == null || !plot.isOwner(owner)) return false;
+    private OwnerActionResult setHomePlotInternal(UUID owner, PlotWorld world, PlotId id) {
+        OwnerCheck check = checkOwnedPlot(world, id, owner, false);
+        if (check.result != OwnerActionResult.SUCCESS) {
+            return check.result;
+        }
+        Plot plot = check.plot;
 
         PlotLocation oldHome = homeByOwner.get(owner);
         if (oldHome != null) {
@@ -306,14 +367,39 @@ public final class PlotService {
         PlotLocation newHome = new PlotLocation(world, id);
         homeByOwner.put(owner, newHome);
 
-        return true;
+        return OwnerActionResult.SUCCESS;
     }
 
-    public boolean setPlotOwner(PlotWorld world, PlotId id, UUID newOwner, String newOwnerName) {
-        return runOnPlotThread(() -> setPlotOwnerInternal(world, id, newOwner, newOwnerName));
+    public OwnerActionResult setPlotOwner(
+            PlotWorld world,
+            PlotId id,
+            UUID requester,
+            boolean bypassOwner,
+            UUID newOwner,
+            String newOwnerName
+    ) {
+        return runOnPlotThread(() -> setPlotOwnerInternal(world, id, requester, bypassOwner, newOwner, newOwnerName));
     }
 
-    private boolean setPlotOwnerInternal(PlotWorld world, PlotId id, UUID newOwner, String newOwnerName) {
+    private OwnerActionResult setPlotOwnerInternal(
+            PlotWorld world,
+            PlotId id,
+            UUID requester,
+            boolean bypassOwner,
+            UUID newOwner,
+            String newOwnerName
+    ) {
+        OwnerCheck check = checkOwnedPlot(world, id, requester, bypassOwner);
+        if (check.result != OwnerActionResult.SUCCESS) {
+            return check.result;
+        }
+        if (!setPlotOwnerUnchecked(world, id, newOwner, newOwnerName)) {
+            return OwnerActionResult.UNCLAIMED;
+        }
+        return OwnerActionResult.SUCCESS;
+    }
+
+    private boolean setPlotOwnerUnchecked(PlotWorld world, PlotId id, UUID newOwner, String newOwnerName) {
         Plot plot = world.getPlot(id);
         if (plot == null || !plot.isClaimed()) return false;
 
@@ -347,10 +433,26 @@ public final class PlotService {
         return new HashMap<>(worlds);
     }
 
-    public void updateMergeGroup(PlotWorld world, PlotId id, UnaryOperator<Plot> updater) {
-        runOnPlotThread(() -> {
-            updateMergeGroupInternal(world, id, updater);
-            return null;
+    public OwnerActionResult updateMergeGroupOwned(
+            PlotWorld world,
+            PlotId id,
+            UUID requester,
+            boolean bypassOwner,
+            UnaryOperator<Plot> updater
+    ) {
+        return runOnPlotThread(() -> {
+            OwnerCheck check = checkOwnedPlot(world, id, requester, bypassOwner);
+            if (check.result != OwnerActionResult.SUCCESS) {
+                return check.result;
+            }
+            UUID baseOwner = check.plot.getOwner();
+            updateMergeGroupInternal(world, id, plot -> {
+                if (!Objects.equals(plot.getOwner(), baseOwner)) {
+                    return plot;
+                }
+                return updater.apply(plot);
+            });
+            return OwnerActionResult.SUCCESS;
         });
     }
 
@@ -386,24 +488,42 @@ public final class PlotService {
 
     public enum MergeResult {
         SUCCESS,
+        UNCLAIMED,
+        NOT_OWNER,
         TARGET_UNCLAIMED,
         NOT_SAME_OWNER,
         ALREADY_MERGED,
         FAILED
     }
 
-    public MergeResult mergePlots(PlotWorld world, PlotId plotId, PlotMergeDirection direction) {
-        return runOnPlotThread(() -> mergePlotsInternal(world, plotId, direction));
+    public MergeResult mergePlots(
+            PlotWorld world,
+            PlotId plotId,
+            PlotMergeDirection direction,
+            UUID requester,
+            boolean bypassOwner
+    ) {
+        return runOnPlotThread(() -> mergePlotsInternal(world, plotId, direction, requester, bypassOwner));
     }
 
-    private MergeResult mergePlotsInternal(PlotWorld world, PlotId plotId, PlotMergeDirection direction) {
+    private MergeResult mergePlotsInternal(
+            PlotWorld world,
+            PlotId plotId,
+            PlotMergeDirection direction,
+            UUID requester,
+            boolean bypassOwner
+    ) {
         if (world == null || plotId == null || direction == null) {
             return MergeResult.FAILED;
         }
-        Plot plot = world.getPlot(plotId);
-        if (plot == null || !plot.isClaimed()) {
-            return MergeResult.FAILED;
+        OwnerCheck check = checkOwnedPlot(world, plotId, requester, bypassOwner);
+        if (check.result == OwnerActionResult.UNCLAIMED) {
+            return MergeResult.UNCLAIMED;
         }
+        if (check.result == OwnerActionResult.NOT_OWNER) {
+            return MergeResult.NOT_OWNER;
+        }
+        Plot plot = check.plot;
 
         PlotId targetId = world.getAdjacentPlotId(plotId, direction);
         Plot targetPlot = world.getPlot(targetId);
@@ -426,22 +546,41 @@ public final class PlotService {
         return MergeResult.SUCCESS;
     }
 
-    public boolean unmergePlots(PlotWorld world, PlotId plotId, PlotMergeDirection direction) {
-        return runOnPlotThread(() -> unmergePlotsInternal(world, plotId, direction));
+    public UnmergeResult unmergePlots(
+            PlotWorld world,
+            PlotId plotId,
+            PlotMergeDirection direction,
+            UUID requester,
+            boolean bypassOwner
+    ) {
+        return runOnPlotThread(() -> unmergePlotsInternal(world, plotId, direction, requester, bypassOwner));
     }
 
-    private boolean unmergePlotsInternal(PlotWorld world, PlotId plotId, PlotMergeDirection direction) {
+    private UnmergeResult unmergePlotsInternal(
+            PlotWorld world,
+            PlotId plotId,
+            PlotMergeDirection direction,
+            UUID requester,
+            boolean bypassOwner
+    ) {
         if (world == null || plotId == null || direction == null) {
-            return false;
+            return UnmergeResult.FAILED;
+        }
+        Plot plot = world.getPlot(plotId);
+        if (plot == null || !plot.isClaimed()) {
+            return UnmergeResult.UNCLAIMED;
+        }
+        if (!bypassOwner && (requester == null || !plot.isOwner(requester))) {
+            return UnmergeResult.NOT_OWNER;
         }
         if (!world.isMerged(plotId, direction)) {
-            return false;
+            return UnmergeResult.NOT_MERGED;
         }
         if (!world.setMerged(plotId, direction, false)) {
-            return false;
+            return UnmergeResult.FAILED;
         }
         updateMergeRoadsInternal(world, plotId, direction);
-        return true;
+        return UnmergeResult.SUCCESS;
     }
 
     public void updateMergeRoads(PlotWorld world, PlotId plotId, PlotMergeDirection direction) {

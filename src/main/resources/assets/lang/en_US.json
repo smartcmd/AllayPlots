@@ -8,6 +8,7 @@
   "allayplots:message.not_plot_world": "&cThis world is not configured for plots.",
   "allayplots:message.already_claimed": "&cThis plot is already claimed.",
   "allayplots:message.claim_success": "&aPlot claimed successfully.",
+  "allayplots:message.claim_failed": "&cFailed to claim plot.",
   "allayplots:message.delete_success": "&aPlot deleted.",
   "allayplots:message.merge_success": "&aPlots merged with &e(%1, %2)&a.",
   "allayplots:message.merge_already": "&cPlots are already merged in that direction.",

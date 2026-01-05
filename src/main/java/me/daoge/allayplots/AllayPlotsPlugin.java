@@ -25,12 +25,10 @@ import java.util.Locale;
 public final class AllayPlotsPlugin extends Plugin {
     private PluginConfig config;
     private PlotService plotService;
-    private PlotStorage plotStorage;
-    private MessageService messageService;
 
     @Override
     public void onLoad() {
-        PlotWorldGeneratorFactory.register(getPluginLogger());
+        PlotWorldGeneratorFactory.register(this.pluginLogger);
     }
 
     @Override
@@ -39,29 +37,28 @@ public final class AllayPlotsPlugin extends Plugin {
         try {
             Files.createDirectories(dataFolder);
         } catch (IOException ex) {
-            getPluginLogger().error("Failed to create plugin data folder.", ex);
+            this.pluginLogger.error("Failed to create plugin data folder.", ex);
         }
 
-        config = PluginConfig.load(dataFolder, getPluginLogger());
-        plotStorage = createStorage(dataFolder);
-        plotService = new PlotService(config, plotStorage, getPluginLogger());
+        config = PluginConfig.load(dataFolder, this.pluginLogger);
+        plotService = new PlotService(config, createStorage(dataFolder), this.pluginLogger);
         plotService.load();
-        messageService = new MessageService();
 
         ensurePlotWorldsLoaded();
 
+        MessageService messageService = new MessageService();
         var eventBus = Server.getInstance().getEventBus();
         eventBus.registerListener(new PlotProtectionListener(plotService, config, messageService));
         eventBus.registerListener(new PlotMovementListener(plotService, config, messageService));
         eventBus.registerListener(new PlotDamageListener(plotService));
 
-        Registries.COMMANDS.register(new PlotCommand(plotService, config, messageService, getPluginLogger()));
+        Registries.COMMANDS.register(new PlotCommand(plotService, config, messageService, this.pluginLogger));
 
         if (config.settings().autoSaveIntervalTicks() > 0) {
             Server.getInstance().getScheduler().scheduleRepeating(this, plotService::save, config.settings().autoSaveIntervalTicks());
         }
 
-        getPluginLogger().info("AllayPlots enabled for {} plot worlds.", plotService.worldCount());
+        this.pluginLogger.info("AllayPlots enabled for {} plot worlds.", plotService.worldCount());
     }
 
     @Override
@@ -75,12 +72,12 @@ public final class AllayPlotsPlugin extends Plugin {
         String rawType = config.storage().type();
         String type = rawType == null ? "" : rawType.trim().toLowerCase(Locale.ROOT);
         return switch (type) {
-            case "sqlite" -> new SqlitePlotStorage(dataFolder, getPluginLogger());
-            case "h2" -> new H2PlotStorage(dataFolder, getPluginLogger());
-            case "", "yaml", "yml" -> new YamlPlotStorage(dataFolder, getPluginLogger());
+            case "sqlite" -> new SqlitePlotStorage(dataFolder, this.pluginLogger);
+            case "h2" -> new H2PlotStorage(dataFolder, this.pluginLogger);
+            case "", "yaml", "yml" -> new YamlPlotStorage(dataFolder, this.pluginLogger);
             default -> {
-                getPluginLogger().warn("Unknown storage type '{}', falling back to yaml.", rawType);
-                yield new YamlPlotStorage(dataFolder, getPluginLogger());
+                this.pluginLogger.warn("Unknown storage type '{}', falling back to yaml.", rawType);
+                yield new YamlPlotStorage(dataFolder, this.pluginLogger);
             }
         };
     }
@@ -97,7 +94,7 @@ public final class AllayPlotsPlugin extends Plugin {
             if (existing != null) {
                 var generatorName = existing.getOverWorld().getWorldGenerator().getName();
                 if (!PlotWorldGeneratorFactory.GENERATOR_NAME.equalsIgnoreCase(generatorName)) {
-                    getPluginLogger().warn(
+                    this.pluginLogger.warn(
                             "World {} is loaded with generator {}, expected {} for plot worlds.",
                             worldName,
                             generatorName,
@@ -109,7 +106,7 @@ public final class AllayPlotsPlugin extends Plugin {
 
             var storageFactory = Registries.WORLD_STORAGE_FACTORIES.get("LEVELDB");
             if (storageFactory == null) {
-                getPluginLogger().error("World storage type LEVELDB is not available; cannot create plot world {}.", worldName);
+                this.pluginLogger.error("World storage type LEVELDB is not available; cannot create plot world {}.", worldName);
                 continue;
             }
 
@@ -123,9 +120,9 @@ public final class AllayPlotsPlugin extends Plugin {
                         null
                 );
             } catch (IllegalArgumentException ex) {
-                getPluginLogger().warn("Plot world {} is already loaded.", worldName);
+                this.pluginLogger.warn("Plot world {} is already loaded.", worldName);
             } catch (Exception ex) {
-                getPluginLogger().error("Failed to load plot world {}.", worldName, ex);
+                this.pluginLogger.error("Failed to load plot world {}.", worldName, ex);
             }
         }
     }

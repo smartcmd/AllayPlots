@@ -88,7 +88,7 @@ public final class PlotCommand extends Command {
     private CommandResult handleClaim(CommandContext context, EntityPlayer player) {
         PlotContext pc = resolvePlotContext(context, player);
         if (pc == null) return context.fail();
-        return doClaim(context, player, pc, false);
+        return doClaim(context, player, pc);
     }
 
     private CommandResult handleAuto(CommandContext context, EntityPlayer player) {
@@ -99,7 +99,7 @@ public final class PlotCommand extends Command {
         }
 
         PlotId nextId = plotService.findNextFreePlotId(world);
-        return doClaim(context, player, new PlotContext(world, nextId), true);
+        return doClaim(context, player, new PlotContext(world, nextId));
     }
 
     private CommandResult handleDelete(CommandContext context, EntityPlayer player) {
@@ -437,7 +437,7 @@ public final class PlotCommand extends Command {
         return dir != null ? dir : PlotMergeDirection.fromYaw(player.getLocation().yaw());
     }
 
-    private CommandResult doClaim(CommandContext context, EntityPlayer player, PlotContext pc, boolean auto) {
+    private CommandResult doClaim(CommandContext context, EntityPlayer player, PlotContext pc) {
         Plot existing = pc.plot();
         if (existing != null && existing.isClaimed()) {
             context.addOutput(messages.render(player, LangKeys.MESSAGE_ALREADY_CLAIMED));

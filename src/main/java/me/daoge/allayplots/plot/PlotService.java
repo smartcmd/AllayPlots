@@ -35,6 +35,7 @@ public final class PlotService {
     private final Map<UUID, PlotLocation> homeByOwner = new ConcurrentHashMap<>();
     private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private boolean dirty = false;
     private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor(
             Thread.ofVirtual().name("AllayPlots-PlotSave", 0).factory());
     private final AtomicBoolean saveInFlight = new AtomicBoolean(false);
@@ -114,6 +115,19 @@ public final class PlotService {
         }
     }
 
+    private void markDirty() {
+        dirty = true;
+    }
+
+    private Map<String, Map<PlotId, Plot>> snapshotIfDirty() {
+        if (!dirty) {
+            return null;
+        }
+        Map<String, Map<PlotId, Plot>> snapshot = snapshotPlots();
+        dirty = false;
+        return snapshot;
+    }
+
     private <T> T runOnPlotThread(Callable<T> action) {
         if (isPlotThread()) {
             try {
@@ -165,6 +179,7 @@ public final class PlotService {
         Map<String, Map<PlotId, Plot>> stored = storage.load();
         worlds.clear();
         homeByOwner.clear();
+        boolean changed = false;
 
         for (Map.Entry<String, PlotWorldConfig> entry : config.worlds().entrySet()) {
             PlotWorld world = new PlotWorld(entry.getValue());
@@ -172,26 +187,42 @@ public final class PlotService {
             Map<PlotId, Plot> worldPlots = stored.get(entry.getKey());
             if (worldPlots != null) {
                 world.putPlots(worldPlots);
-                world.normalizeMerges();
+                if (world.normalizeMerges()) {
+                    changed = true;
+                }
             }
 
             worlds.put(entry.getKey(), world);
         }
 
-        rebuildOwnerIndexes();
+        if (rebuildOwnerIndexes()) {
+            changed = true;
+        }
 
         if (!stored.isEmpty() && worlds.isEmpty()) {
             logger.warn("Plot data exists but no plot worlds are configured.");
         }
+        if (changed) {
+            markDirty();
+        }
     }
 
     public void save() {
-        Map<String, Map<PlotId, Plot>> snapshot = runOnPlotThread(this::snapshotPlots);
+        Map<String, Map<PlotId, Plot>> snapshot = runOnPlotThread(this::snapshotIfDirty);
+        if (snapshot == null) {
+            return;
+        }
         saveBlocking(snapshot);
     }
 
     public void requestSave() {
-        submitAsync(() -> enqueueSave(snapshotPlots()));
+        submitAsync(() -> {
+            Map<String, Map<PlotId, Plot>> snapshot = snapshotIfDirty();
+            if (snapshot == null) {
+                return;
+            }
+            enqueueSave(snapshot);
+        });
     }
 
     public int worldCount() {
@@ -278,6 +309,7 @@ public final class PlotService {
             world.putPlot(id, plot);
             homeByOwner.put(owner, loc);
         }
+        markDirty();
         return plot;
     }
 
@@ -316,8 +348,11 @@ public final class PlotService {
                 ? Set.copyOf(removed.getMergedDirections())
                 : Set.of();
 
-        world.clearMergedConnections(id);
+        if (world.clearMergedConnections(id)) {
+            markDirty();
+        }
         world.removePlot(id);
+        markDirty();
         for (PlotMergeDirection direction : mergedDirections) {
             updateMergeRoadsInternal(world, id, direction);
         }
@@ -329,8 +364,8 @@ public final class PlotService {
             boolean affectsHome = removed.isHome()
                     || (homeLoc != null && homeLoc.world() == world && homeLoc.id().equals(id));
 
-            if (affectsHome) {
-                recomputeOwnerIndexes(owner);
+            if (affectsHome && recomputeOwnerIndexes(owner)) {
+                markDirty();
             }
         }
     }
@@ -357,22 +392,33 @@ public final class PlotService {
             return check.result;
         }
         Plot plot = check.plot;
+        boolean changed = false;
 
         PlotLocation oldHome = homeByOwner.get(owner);
         if (oldHome != null) {
             if (!(oldHome.world() == world && oldHome.id().equals(id))) {
                 Plot oldPlot = oldHome.plot();
                 if (oldPlot != null && oldPlot.isOwner(owner) && oldPlot.isHome()) {
-                    oldHome.world().putPlot(oldHome.id(), oldPlot.withHome(false));
+                    Plot updated = oldPlot.withHome(false);
+                    if (updated != oldPlot) {
+                        oldHome.world().putPlot(oldHome.id(), updated);
+                        changed = true;
+                    }
                 }
             }
         }
 
-        plot = plot.withHome(true);
-        world.putPlot(id, plot);
+        Plot updated = plot.withHome(true);
+        if (updated != plot) {
+            world.putPlot(id, updated);
+            changed = true;
+        }
         PlotLocation newHome = new PlotLocation(world, id);
         homeByOwner.put(owner, newHome);
 
+        if (changed) {
+            markDirty();
+        }
         return OwnerActionResult.SUCCESS;
     }
 
@@ -408,30 +454,47 @@ public final class PlotService {
     private boolean setPlotOwnerUnchecked(PlotWorld world, PlotId id, UUID newOwner, String newOwnerName) {
         Plot plot = world.getPlot(id);
         if (plot == null || !plot.isClaimed()) return false;
+        boolean changed = false;
 
         UUID oldOwner = plot.getOwner();
         if (oldOwner != null && oldOwner.equals(newOwner)) {
             Plot updated = plot.withOwner(newOwner, newOwnerName);
             if (updated != plot) {
                 world.putPlot(id, updated);
+                changed = true;
+            }
+            if (changed) {
+                markDirty();
             }
             return true;
         }
 
-        world.clearMergedConnections(id);
+        if (world.clearMergedConnections(id)) {
+            changed = true;
+        }
         plot = plot.withOwner(newOwner, newOwnerName);
         world.putPlot(id, plot);
+        changed = true;
 
         if (oldOwner != null) {
-            recomputeOwnerIndexes(oldOwner);
+            if (recomputeOwnerIndexes(oldOwner)) {
+                changed = true;
+            }
         }
 
         if (newOwner != null && !homeByOwner.containsKey(newOwner)) {
-            plot = plot.withHome(true);
-            world.putPlot(id, plot);
+            Plot updated = plot.withHome(true);
+            if (updated != plot) {
+                plot = updated;
+                world.putPlot(id, plot);
+                changed = true;
+            }
             homeByOwner.put(newOwner, new PlotLocation(world, id));
         }
 
+        if (changed) {
+            markDirty();
+        }
         return true;
     }
 
@@ -508,13 +571,18 @@ public final class PlotService {
     }
 
     private void updateMergeGroupInternal(PlotWorld world, PlotId id, UnaryOperator<Plot> updater) {
+        boolean changed = false;
         for (PlotId plotId : world.getMergeGroup(id)) {
             Plot plot = world.getPlot(plotId);
             if (plot == null) continue;
             Plot updated = updater.apply(plot);
             if (updated != plot) {
                 world.putPlot(plotId, updated);
+                changed = true;
             }
+        }
+        if (changed) {
+            markDirty();
         }
     }
 
@@ -583,6 +651,7 @@ public final class PlotService {
         if (!world.setMerged(plotId, direction, true)) {
             return MergeResult.FAILED;
         }
+        markDirty();
 
         Plot source = world.getPlot(plotId);
         syncPlotSettingsInternal(world, plotId, source);
@@ -623,6 +692,7 @@ public final class PlotService {
         if (!world.setMerged(plotId, direction, false)) {
             return UnmergeResult.FAILED;
         }
+        markDirty();
         updateMergeRoadsInternal(world, plotId, direction);
         return UnmergeResult.SUCCESS;
     }
@@ -771,8 +841,9 @@ public final class PlotService {
         }
     }
 
-    private void rebuildOwnerIndexes() {
+    private boolean rebuildOwnerIndexes() {
         Map<UUID, PlotLocation> fallbackByOwner = new HashMap<>();
+        boolean changed = false;
 
         for (PlotWorld world : worlds.values()) {
             for (Plot plot : world.getPlots().values()) {
@@ -794,16 +865,22 @@ public final class PlotService {
             PlotLocation loc = entry.getValue();
             Plot plot = loc.plot();
             if (plot != null && !plot.isHome()) {
-                loc.world().putPlot(loc.id(), plot.withHome(true));
+                Plot updated = plot.withHome(true);
+                if (updated != plot) {
+                    loc.world().putPlot(loc.id(), updated);
+                    changed = true;
+                }
             }
             homeByOwner.put(entry.getKey(), loc);
         }
+        return changed;
     }
 
-    private void recomputeOwnerIndexes(UUID owner) {
+    private boolean recomputeOwnerIndexes(UUID owner) {
         homeByOwner.remove(owner);
 
         PlotLocation fallback = null;
+        boolean changed = false;
 
         for (PlotWorld world : worlds.values()) {
             for (Plot plot : world.getPlots().values()) {
@@ -813,7 +890,7 @@ public final class PlotService {
 
                 if (plot.isHome()) {
                     homeByOwner.put(owner, loc);
-                    return;
+                    return changed;
                 }
 
                 if (fallback == null) fallback = loc;
@@ -823,10 +900,15 @@ public final class PlotService {
         if (fallback != null) {
             Plot plot = fallback.plot();
             if (plot != null && !plot.isHome()) {
-                fallback.world().putPlot(fallback.id(), plot.withHome(true));
+                Plot updated = plot.withHome(true);
+                if (updated != plot) {
+                    fallback.world().putPlot(fallback.id(), updated);
+                    changed = true;
+                }
             }
             homeByOwner.put(owner, fallback);
         }
+        return changed;
     }
 
     private record UpdateArea(

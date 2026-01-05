@@ -192,8 +192,9 @@ public final class PlotWorld {
         return true;
     }
 
-    public void clearMergedConnections(PlotId id) {
+    public boolean clearMergedConnections(PlotId id) {
         Plot plot = plots.get(id);
+        boolean changed = false;
         for (PlotMergeDirection dir : PlotMergeDirection.values()) {
             PlotId neighborId = getAdjacentPlotId(id, dir);
             Plot neighbor = plots.get(neighborId);
@@ -201,18 +202,21 @@ public final class PlotWorld {
                 Plot updated = neighbor.withMergedDirectionRemoved(dir.opposite());
                 if (updated != neighbor) {
                     plots.put(neighborId, updated);
+                    changed = true;
                 }
             }
             if (plot != null) {
                 Plot updated = plot.withMergedDirectionRemoved(dir);
                 if (updated != plot) {
                     plot = updated;
+                    changed = true;
                 }
             }
         }
         if (plot != null) {
             plots.put(id, plot);
         }
+        return changed;
     }
 
     public Set<PlotId> getMergeGroup(PlotId id) {
@@ -256,7 +260,8 @@ public final class PlotWorld {
         return root != null ? root : id;
     }
 
-    public void normalizeMerges() {
+    public boolean normalizeMerges() {
+        boolean changed = false;
         for (Map.Entry<PlotId, Plot> entry : plots.entrySet()) {
             PlotId id = entry.getKey();
             Plot plot = entry.getValue();
@@ -277,6 +282,7 @@ public final class PlotWorld {
                         Plot updatedNeighbor = neighbor.withMergedDirectionRemoved(dir.opposite());
                         if (updatedNeighbor != neighbor) {
                             plots.put(neighborId, updatedNeighbor);
+                            changed = true;
                         }
                     }
                     continue;
@@ -288,7 +294,9 @@ public final class PlotWorld {
             }
             if (updated != plot) {
                 plots.put(id, updated);
+                changed = true;
             }
         }
+        return changed;
     }
 }

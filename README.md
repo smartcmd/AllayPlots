@@ -157,7 +157,7 @@ cd AllayPlots
 
 **Requirements:**
 - Java 21 or higher
-- Gradle 8.x
+- Gradle
 
 ## 🤝 Contributing
 

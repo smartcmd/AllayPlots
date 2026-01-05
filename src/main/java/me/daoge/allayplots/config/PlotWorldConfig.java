@@ -39,6 +39,14 @@ public final class PlotWorldConfig extends OkaeriConfig {
     @CustomKey("teleport-on-claim")
     private boolean teleportOnClaim = true;
 
+    @Comment("Block used for plot surface.")
+    @CustomKey("plot-block")
+    private String plotBlock = "minecraft:grass_block";
+
+    @Comment("Block used for roads.")
+    @CustomKey("road-block")
+    private String roadBlock = "minecraft:oak_planks";
+
     @Comment("Block used for road edges.")
     @CustomKey("road-edge-block")
     private String roadEdgeBlock = "minecraft:smooth_stone_slab";
@@ -46,6 +54,14 @@ public final class PlotWorldConfig extends OkaeriConfig {
     @Comment("Block used for road corners.")
     @CustomKey("road-corner-block")
     private String roadCornerBlock = "minecraft:smooth_stone_slab";
+
+    @Comment("Block used to fill below ground.")
+    @CustomKey("fill-block")
+    private String fillBlock = "minecraft:dirt";
+
+    @Comment("Block used for bottom bedrock layer.")
+    @CustomKey("bedrock-block")
+    private String bedrockBlock = "minecraft:bedrock";
 
     public void worldName(String worldName) {
         if (worldName != null && !worldName.isBlank()) {

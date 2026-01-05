@@ -2,9 +2,6 @@ package me.daoge.allayplots.generator;
 
 import me.daoge.allayplots.config.PlotWorldConfig;
 
-import java.util.HashMap;
-import java.util.Map;
-
 public record PlotGeneratorPreset(
         int plotSize,
         int roadSize,
@@ -41,73 +38,63 @@ public record PlotGeneratorPreset(
     }
 
     public static PlotGeneratorPreset fromConfig(PlotWorldConfig config) {
-        PlotGeneratorPreset defaults = defaults();
-        String roadEdgeBlock = config.roadEdgeBlock();
-        if (roadEdgeBlock == null || roadEdgeBlock.isBlank()) {
-            roadEdgeBlock = defaults.roadEdgeBlock();
-        }
-        String roadCornerBlock = config.roadCornerBlock();
-        if (roadCornerBlock == null || roadCornerBlock.isBlank()) {
-            roadCornerBlock = defaults.roadCornerBlock();
-        }
+        PlotGeneratorPreset d = defaults();
+
+        int plotSize = Math.max(1, config.plotSize());
+        int roadSize = Math.max(0, config.roadSize());
+        int groundY = config.groundY();
+
         return new PlotGeneratorPreset(
-                config.plotSize(),
-                config.roadSize(),
-                config.groundY(),
-                defaults.plotBlock(),
-                defaults.roadBlock(),
-                roadEdgeBlock,
-                roadCornerBlock,
-                defaults.fillBlock(),
-                defaults.bedrockBlock()
+                plotSize,
+                roadSize,
+                groundY,
+                orDefaultBlank(config.plotBlock(), d.plotBlock()),
+                orDefaultBlank(config.roadBlock(), d.roadBlock()),
+                orDefaultBlank(config.roadEdgeBlock(), d.roadEdgeBlock()),
+                orDefaultBlank(config.roadCornerBlock(), d.roadCornerBlock()),
+                orDefaultBlank(config.fillBlock(), d.fillBlock()),
+                orDefaultBlank(config.bedrockBlock(), d.bedrockBlock())
         );
     }
 
     public static PlotGeneratorPreset fromPreset(String preset) {
-        PlotGeneratorPreset defaults = defaults();
+        PlotGeneratorPreset d = defaults();
         if (preset == null || preset.isBlank()) {
-            return defaults;
+            return d;
         }
 
-        int plotSize = defaults.plotSize();
-        int roadSize = defaults.roadSize();
-        int groundY = defaults.groundY();
-        String plotBlock = defaults.plotBlock();
-        String roadBlock = defaults.roadBlock();
-        String roadEdgeBlock = defaults.roadEdgeBlock();
-        String roadCornerBlock = defaults.roadCornerBlock();
-        String fillBlock = defaults.fillBlock();
-        String bedrockBlock = defaults.bedrockBlock();
+        int plotSize = d.plotSize();
+        int roadSize = d.roadSize();
+        int groundY = d.groundY();
+        String plotBlock = d.plotBlock();
+        String roadBlock = d.roadBlock();
+        String roadEdgeBlock = d.roadEdgeBlock();
+        String roadCornerBlock = d.roadCornerBlock();
+        String fillBlock = d.fillBlock();
+        String bedrockBlock = d.bedrockBlock();
 
-        String[] parts = preset.split(";");
-        for (String part : parts) {
-            if (part.isBlank()) {
-                continue;
-            }
-            String[] kv = part.split("=", 2);
-            if (kv.length != 2) {
-                continue;
-            }
-            String key = kv[0].trim();
-            String value = kv[1].trim();
-            if (key.equalsIgnoreCase(KEY_PLOT_SIZE)) {
-                plotSize = parseInt(value, plotSize);
-            } else if (key.equalsIgnoreCase(KEY_ROAD_SIZE)) {
-                roadSize = parseInt(value, roadSize);
-            } else if (key.equalsIgnoreCase(KEY_GROUND_Y)) {
-                groundY = parseInt(value, groundY);
-            } else if (key.equalsIgnoreCase(KEY_PLOT_BLOCK)) {
-                plotBlock = value;
-            } else if (key.equalsIgnoreCase(KEY_ROAD_BLOCK)) {
-                roadBlock = value;
-            } else if (key.equalsIgnoreCase(KEY_ROAD_EDGE_BLOCK)) {
-                roadEdgeBlock = value;
-            } else if (key.equalsIgnoreCase(KEY_ROAD_CORNER_BLOCK)) {
-                roadCornerBlock = value;
-            } else if (key.equalsIgnoreCase(KEY_FILL_BLOCK)) {
-                fillBlock = value;
-            } else if (key.equalsIgnoreCase(KEY_BEDROCK_BLOCK)) {
-                bedrockBlock = value;
+        for (String part : preset.split(";")) {
+            if (part.isBlank()) continue;
+
+            int eq = part.indexOf('=');
+            if (eq <= 0 || eq == part.length() - 1) continue;
+
+            String key = part.substring(0, eq).trim().toLowerCase();
+            String value = part.substring(eq + 1).trim();
+
+            switch (key) {
+                case KEY_PLOT_SIZE -> plotSize = parseInt(value, plotSize);
+                case KEY_ROAD_SIZE -> roadSize = parseInt(value, roadSize);
+                case KEY_GROUND_Y -> groundY = parseInt(value, groundY);
+                case KEY_PLOT_BLOCK -> plotBlock = value;
+                case KEY_ROAD_BLOCK -> roadBlock = value;
+                case KEY_ROAD_EDGE_BLOCK -> roadEdgeBlock = value;
+                case KEY_ROAD_CORNER_BLOCK -> roadCornerBlock = value;
+                case KEY_FILL_BLOCK -> fillBlock = value;
+                case KEY_BEDROCK_BLOCK -> bedrockBlock = value;
+                default -> {
+                    // ignore unknown keys
+                }
             }
         }
 
@@ -125,25 +112,26 @@ public record PlotGeneratorPreset(
     }
 
     public String toPresetString() {
-        Map<String, String> values = new HashMap<>();
-        values.put(KEY_PLOT_SIZE, String.valueOf(plotSize));
-        values.put(KEY_ROAD_SIZE, String.valueOf(roadSize));
-        values.put(KEY_GROUND_Y, String.valueOf(groundY));
-        values.put(KEY_PLOT_BLOCK, plotBlock);
-        values.put(KEY_ROAD_BLOCK, roadBlock);
-        values.put(KEY_ROAD_EDGE_BLOCK, roadEdgeBlock);
-        values.put(KEY_ROAD_CORNER_BLOCK, roadCornerBlock);
-        values.put(KEY_FILL_BLOCK, fillBlock);
-        values.put(KEY_BEDROCK_BLOCK, bedrockBlock);
+        StringBuilder b = new StringBuilder(160);
+        appendKV(b, KEY_PLOT_SIZE, String.valueOf(plotSize));
+        appendKV(b, KEY_ROAD_SIZE, String.valueOf(roadSize));
+        appendKV(b, KEY_GROUND_Y, String.valueOf(groundY));
+        appendKV(b, KEY_PLOT_BLOCK, plotBlock);
+        appendKV(b, KEY_ROAD_BLOCK, roadBlock);
+        appendKV(b, KEY_ROAD_EDGE_BLOCK, roadEdgeBlock);
+        appendKV(b, KEY_ROAD_CORNER_BLOCK, roadCornerBlock);
+        appendKV(b, KEY_FILL_BLOCK, fillBlock);
+        appendKV(b, KEY_BEDROCK_BLOCK, bedrockBlock);
+        return b.toString();
+    }
 
-        StringBuilder builder = new StringBuilder();
-        for (Map.Entry<String, String> entry : values.entrySet()) {
-            if (!builder.isEmpty()) {
-                builder.append(';');
-            }
-            builder.append(entry.getKey()).append('=').append(entry.getValue());
-        }
-        return builder.toString();
+    private static void appendKV(StringBuilder b, String key, String value) {
+        if (!b.isEmpty()) b.append(';');
+        b.append(key).append('=').append(value);
+    }
+
+    private static String orDefaultBlank(String value, String fallback) {
+        return (value == null || value.isBlank()) ? fallback : value;
     }
 
     private static int parseInt(String value, int fallback) {

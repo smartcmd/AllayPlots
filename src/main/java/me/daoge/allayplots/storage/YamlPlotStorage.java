@@ -3,7 +3,6 @@ package me.daoge.allayplots.storage;
 import me.daoge.allayplots.plot.Plot;
 import me.daoge.allayplots.plot.PlotId;
 import me.daoge.allayplots.plot.PlotMergeDirection;
-import me.daoge.allayplots.plot.PlotWorld;
 import org.allaymc.api.utils.config.Config;
 import org.allaymc.api.utils.config.ConfigSection;
 import org.slf4j.Logger;
@@ -108,16 +107,16 @@ public final class YamlPlotStorage implements PlotStorage {
     }
 
     @Override
-    public void save(Map<String, PlotWorld> worlds) {
+    public void save(Map<String, Map<PlotId, Plot>> worlds) {
         ConfigSection root = new ConfigSection();
         root.set("version", 1);
 
         ConfigSection worldsSection = new ConfigSection();
-        for (PlotWorld world : worlds.values()) {
+        for (Map.Entry<String, Map<PlotId, Plot>> entry : worlds.entrySet()) {
             ConfigSection worldSection = new ConfigSection();
             ConfigSection plotsSection = new ConfigSection();
 
-            for (Plot plot : world.getPlots().values()) {
+            for (Plot plot : entry.getValue().values()) {
                 if (plot.isDefault()) {
                     continue;
                 }
@@ -140,10 +139,10 @@ public final class YamlPlotStorage implements PlotStorage {
                 }
                 if (!plot.getFlags().isEmpty()) {
                     ConfigSection flagsSection = new ConfigSection();
-                    for (Map.Entry<String, String> entry : plot.getFlags().entrySet()) {
-                        String value = entry.getValue();
+                    for (Map.Entry<String, String> flagEntry : plot.getFlags().entrySet()) {
+                        String value = flagEntry.getValue();
                         if (value != null && !value.isBlank()) {
-                            flagsSection.set(entry.getKey(), value);
+                            flagsSection.set(flagEntry.getKey(), value);
                         }
                     }
                     if (!flagsSection.isEmpty()) {
@@ -161,7 +160,7 @@ public final class YamlPlotStorage implements PlotStorage {
             }
 
             worldSection.set("plots", plotsSection);
-            worldsSection.set(world.getConfig().worldName(), worldSection);
+            worldsSection.set(entry.getKey(), worldSection);
         }
 
         root.set("worlds", worldsSection);

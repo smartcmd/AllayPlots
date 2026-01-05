@@ -19,8 +19,11 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 public final class PlotService {
@@ -32,6 +35,11 @@ public final class PlotService {
     private final Map<UUID, PlotLocation> homeByOwner = new ConcurrentHashMap<>();
     private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor(
+            Thread.ofVirtual().name("AllayPlots-PlotSave", 0).factory());
+    private final AtomicBoolean saveInFlight = new AtomicBoolean(false);
+    private final AtomicReference<Map<String, Map<PlotId, Plot>>> pendingSave = new AtomicReference<>();
+    private final Object saveLock = new Object();
     private Thread serviceThread;
     private static final Runnable POISON_PILL = () -> {};
 
@@ -54,14 +62,14 @@ public final class PlotService {
             return;
         }
         taskQueue.offer(POISON_PILL);
-        if (serviceThread == null) {
-            return;
+        if (serviceThread != null) {
+            try {
+                serviceThread.join();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
         }
-        try {
-            serviceThread.join();
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-        }
+        saveExecutor.shutdown();
     }
 
     private void runLoop() {
@@ -178,14 +186,12 @@ public final class PlotService {
     }
 
     public void save() {
-        runOnPlotThread(() -> {
-            storage.save(snapshotWorlds());
-            return null;
-        });
+        Map<String, Map<PlotId, Plot>> snapshot = runOnPlotThread(this::snapshotPlots);
+        saveBlocking(snapshot);
     }
 
     public void requestSave() {
-        submitAsync(() -> storage.save(snapshotWorlds()));
+        submitAsync(() -> enqueueSave(snapshotPlots()));
     }
 
     public int worldCount() {
@@ -429,8 +435,46 @@ public final class PlotService {
         return true;
     }
 
-    public Map<String, PlotWorld> snapshotWorlds() {
-        return new HashMap<>(worlds);
+    private void enqueueSave(Map<String, Map<PlotId, Plot>> snapshot) {
+        pendingSave.set(snapshot);
+        if (saveInFlight.compareAndSet(false, true)) {
+            saveExecutor.execute(this::runSaveLoop);
+        }
+    }
+
+    private void runSaveLoop() {
+        try {
+            while (true) {
+                Map<String, Map<PlotId, Plot>> snapshot = pendingSave.getAndSet(null);
+                if (snapshot == null) {
+                    break;
+                }
+                try {
+                    saveBlocking(snapshot);
+                } catch (Throwable ex) {
+                    logger.error("Failed to save plot data.", ex);
+                }
+            }
+        } finally {
+            saveInFlight.set(false);
+            if (pendingSave.get() != null && saveInFlight.compareAndSet(false, true)) {
+                saveExecutor.execute(this::runSaveLoop);
+            }
+        }
+    }
+
+    private void saveBlocking(Map<String, Map<PlotId, Plot>> snapshot) {
+        synchronized (saveLock) {
+            storage.save(snapshot);
+        }
+    }
+
+    private Map<String, Map<PlotId, Plot>> snapshotPlots() {
+        Map<String, Map<PlotId, Plot>> snapshot = new HashMap<>(worlds.size());
+        for (Map.Entry<String, PlotWorld> entry : worlds.entrySet()) {
+            snapshot.put(entry.getKey(), new HashMap<>(entry.getValue().getPlots()));
+        }
+        return snapshot;
     }
 
     public OwnerActionResult updateMergeGroupOwned(

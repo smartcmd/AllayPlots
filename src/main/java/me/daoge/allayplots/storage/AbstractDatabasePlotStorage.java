@@ -3,7 +3,6 @@ package me.daoge.allayplots.storage;
 import me.daoge.allayplots.plot.Plot;
 import me.daoge.allayplots.plot.PlotId;
 import me.daoge.allayplots.plot.PlotMergeDirection;
-import me.daoge.allayplots.plot.PlotWorld;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -99,7 +98,7 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
     }
 
     @Override
-    public void save(Map<String, PlotWorld> worlds) {
+    public void save(Map<String, Map<PlotId, Plot>> worlds) {
         try (Connection connection = openConnection()) {
             initSchema(connection);
             connection.setAutoCommit(false);
@@ -281,12 +280,12 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
         result.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
-    private void insertPlots(Connection connection, Map<String, PlotWorld> worlds) throws SQLException {
+    private void insertPlots(Connection connection, Map<String, Map<PlotId, Plot>> worlds) throws SQLException {
         String sql = "INSERT INTO plots (world_name, plot_x, plot_z, owner, owner_name, home) VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            for (PlotWorld world : worlds.values()) {
-                String worldName = world.getConfig().worldName();
-                for (Plot plot : world.getPlots().values()) {
+            for (Map.Entry<String, Map<PlotId, Plot>> entry : worlds.entrySet()) {
+                String worldName = entry.getKey();
+                for (Plot plot : entry.getValue().values()) {
                     if (plot.isDefault()) {
                         continue;
                     }
@@ -312,13 +311,13 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
         }
     }
 
-    private void insertAccessLists(Connection connection, Map<String, PlotWorld> worlds, boolean trusted) throws SQLException {
+    private void insertAccessLists(Connection connection, Map<String, Map<PlotId, Plot>> worlds, boolean trusted) throws SQLException {
         String table = trusted ? "plot_trusted" : "plot_denied";
         String sql = "INSERT INTO " + table + " (world_name, plot_x, plot_z, player_uuid) VALUES (?, ?, ?, ?)";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            for (PlotWorld world : worlds.values()) {
-                String worldName = world.getConfig().worldName();
-                for (Plot plot : world.getPlots().values()) {
+            for (Map.Entry<String, Map<PlotId, Plot>> entry : worlds.entrySet()) {
+                String worldName = entry.getKey();
+                for (Plot plot : entry.getValue().values()) {
                     if (plot.isDefault()) {
                         continue;
                     }
@@ -335,24 +334,24 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
         }
     }
 
-    private void insertFlags(Connection connection, Map<String, PlotWorld> worlds) throws SQLException {
+    private void insertFlags(Connection connection, Map<String, Map<PlotId, Plot>> worlds) throws SQLException {
         String sql = "INSERT INTO plot_flags (world_name, plot_x, plot_z, flag_key, flag_value) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            for (PlotWorld world : worlds.values()) {
-                String worldName = world.getConfig().worldName();
-                for (Plot plot : world.getPlots().values()) {
+            for (Map.Entry<String, Map<PlotId, Plot>> entry : worlds.entrySet()) {
+                String worldName = entry.getKey();
+                for (Plot plot : entry.getValue().values()) {
                     if (plot.isDefault() || plot.getFlags().isEmpty()) {
                         continue;
                     }
-                    for (Map.Entry<String, String> entry : plot.getFlags().entrySet()) {
-                        String value = entry.getValue();
+                    for (Map.Entry<String, String> flagEntry : plot.getFlags().entrySet()) {
+                        String value = flagEntry.getValue();
                         if (value == null || value.isBlank()) {
                             continue;
                         }
                         stmt.setString(1, worldName);
                         stmt.setInt(2, plot.getId().x());
                         stmt.setInt(3, plot.getId().z());
-                        stmt.setString(4, entry.getKey());
+                        stmt.setString(4, flagEntry.getKey());
                         stmt.setString(5, value);
                         stmt.addBatch();
                     }
@@ -362,12 +361,12 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
         }
     }
 
-    private void insertMerged(Connection connection, Map<String, PlotWorld> worlds) throws SQLException {
+    private void insertMerged(Connection connection, Map<String, Map<PlotId, Plot>> worlds) throws SQLException {
         String sql = "INSERT INTO plot_merged (world_name, plot_x, plot_z, direction) VALUES (?, ?, ?, ?)";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            for (PlotWorld world : worlds.values()) {
-                String worldName = world.getConfig().worldName();
-                for (Plot plot : world.getPlots().values()) {
+            for (Map.Entry<String, Map<PlotId, Plot>> entry : worlds.entrySet()) {
+                String worldName = entry.getKey();
+                for (Plot plot : entry.getValue().values()) {
                     if (plot.isDefault() || plot.getMergedDirections().isEmpty()) {
                         continue;
                     }

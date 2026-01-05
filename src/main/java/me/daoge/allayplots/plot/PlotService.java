@@ -108,9 +108,15 @@ public final class PlotService {
 
     public void deletePlot(PlotWorld world, PlotId id) {
         Plot removed = world.getPlot(id);
+        Set<PlotMergeDirection> mergedDirections = removed != null
+                ? Set.copyOf(removed.getMergedDirections())
+                : Set.of();
 
         world.clearMergedConnections(id);
         world.removePlot(id);
+        for (PlotMergeDirection direction : mergedDirections) {
+            updateMergeRoads(world, id, direction);
+        }
 
         if (removed != null && removed.getOwner() != null) {
             UUID owner = removed.getOwner();
@@ -154,6 +160,32 @@ public final class PlotService {
         plot.setHome(true);
         PlotLocation newHome = new PlotLocation(world, id, plot);
         homeByOwner.put(owner, newHome);
+
+        return true;
+    }
+
+    public boolean setPlotOwner(PlotWorld world, PlotId id, UUID newOwner, String newOwnerName) {
+        Plot plot = world.getPlot(id);
+        if (plot == null || !plot.isClaimed()) return false;
+
+        UUID oldOwner = plot.getOwner();
+        if (oldOwner != null && oldOwner.equals(newOwner)) {
+            plot.setOwnerName(newOwnerName);
+            return true;
+        }
+
+        world.clearMergedConnections(id);
+        plot.setOwner(newOwner, newOwnerName);
+
+        if (oldOwner != null) {
+            recomputeOwnerIndexes(oldOwner);
+        }
+
+        PlotLocation loc = new PlotLocation(world, id, plot);
+        if (!homeByOwner.containsKey(newOwner)) {
+            plot.setHome(true);
+            homeByOwner.put(newOwner, loc);
+        }
 
         return true;
     }

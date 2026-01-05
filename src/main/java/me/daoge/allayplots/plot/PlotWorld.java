@@ -177,13 +177,15 @@ public final class PlotWorld {
 
     public void clearMergedConnections(PlotId id) {
         Plot plot = plots.get(id);
-        if (plot == null) return;
-
-        for (PlotMergeDirection dir : Set.copyOf(plot.getMergedDirections())) {
+        for (PlotMergeDirection dir : PlotMergeDirection.values()) {
             PlotId neighborId = getAdjacentPlotId(id, dir);
             Plot neighbor = plots.get(neighborId);
-            if (neighbor != null) neighbor.removeMergedDirection(dir.opposite());
-            plot.removeMergedDirection(dir);
+            if (neighbor != null) {
+                neighbor.removeMergedDirection(dir.opposite());
+            }
+            if (plot != null) {
+                plot.removeMergedDirection(dir);
+            }
         }
     }
 

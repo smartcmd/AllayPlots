@@ -29,6 +29,7 @@
   "allayplots:message.home_not_found": "&cNo plots found for &e%1&c.",
   "allayplots:message.home_set": "&aPlot home set to &e(%1, %2) &7(&f%3&7).",
   "allayplots:message.home_teleport": "&aTeleported to plot home &e(%1, %2) &7(&f%3&7).",
+  "allayplots:message.owner_set": "&aPlot owner set to &e%1 &7(&f%2, %3&7) &7(&f%4&7).",
   "allayplots:message.no_permission": "&cYou do not have permission to do that.",
   "allayplots:message.flag_list": "&7Flags: &e%1",
   "allayplots:message.flag_value": "&7Flag &e%1 &7is set to &f%2&7.",
@@ -36,7 +37,7 @@
   "allayplots:message.flag_reset": "&aFlag &e%1 &areset to default (&f%2&a).",
   "allayplots:message.flag_invalid_value": "&cInvalid flag value. Use true/false, on/off, allow/deny.",
   "allayplots:command.plot.description": "Plot management commands",
-  "allayplots:command.plot.help": "&7Commands: &eclaim&7, &eauto&7, &edelete&7, &emerge&7, &eunmerge&7, &einfo&7, &ehome&7, &esethome&7, &etrust&7, &euntrust&7, &edeny&7, &eundeny&7, &eflag",
+  "allayplots:command.plot.help": "&7Commands: &eclaim&7, &eauto&7, &edelete&7, &emerge&7, &eunmerge&7, &einfo&7, &ehome&7, &esethome&7, &esetowner&7, &etrust&7, &euntrust&7, &edeny&7, &eundeny&7, &eflag",
   "allayplots:command.plot.info.header": "&6Plot &e(%1, %2) &7(&f%3&7)",
   "allayplots:command.plot.info.access": "&7Trusted: &a%1 &8| &7Denied: &c%2"
 }

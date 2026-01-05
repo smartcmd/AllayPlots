@@ -34,6 +34,7 @@ public final class LangKeys {
     public static final String MESSAGE_HOME_NOT_FOUND = "allayplots:message.home_not_found";
     public static final String MESSAGE_HOME_SET = "allayplots:message.home_set";
     public static final String MESSAGE_HOME_TELEPORT = "allayplots:message.home_teleport";
+    public static final String MESSAGE_OWNER_SET = "allayplots:message.owner_set";
     public static final String MESSAGE_NO_PERMISSION = "allayplots:message.no_permission";
     public static final String MESSAGE_FLAG_LIST = "allayplots:message.flag_list";
     public static final String MESSAGE_FLAG_VALUE = "allayplots:message.flag_value";

@@ -68,6 +68,8 @@ public final class PlotCommand extends Command {
                 .exec(this::handleHomeOther, SenderType.PLAYER);
 
         root.key("sethome").exec(this::handleSetHome, SenderType.PLAYER);
+        root.key("setowner").playerTarget("player")
+                .exec(this::handleSetOwner, SenderType.PLAYER);
 
         root.key("trust").playerTarget("player").exec(this::handleTrust, SenderType.PLAYER);
         root.key("untrust").playerTarget("player").exec(this::handleUntrust, SenderType.PLAYER);
@@ -243,6 +245,31 @@ public final class PlotCommand extends Command {
         context.addOutput(messages.render(
                 player,
                 LangKeys.MESSAGE_HOME_SET,
+                pc.plotId().x(),
+                pc.plotId().z(),
+                pc.world().getConfig().worldName()
+        ));
+        return context.success();
+    }
+
+    private CommandResult handleSetOwner(CommandContext context, EntityPlayer player) {
+        PlotContext pc = resolvePlotContext(context, player);
+        if (pc == null) return context.fail();
+
+        if (requireOwnedPlot(context, player, pc) == null) return context.fail();
+
+        EntityPlayer target = resolveSingleTarget(context, 1);
+        if (target == null) return context.fail();
+
+        if (!plotService.setPlotOwner(pc.world(), pc.plotId(), target.getUniqueId(), resolveOwnerName(target))) {
+            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+            return context.fail();
+        }
+
+        context.addOutput(messages.render(
+                player,
+                LangKeys.MESSAGE_OWNER_SET,
+                target.getDisplayName(),
                 pc.plotId().x(),
                 pc.plotId().z(),
                 pc.world().getConfig().worldName()

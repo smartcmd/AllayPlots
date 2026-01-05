@@ -13,6 +13,7 @@ import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 public abstract class AbstractDatabasePlotStorage implements PlotStorage {
     private static final String CREATE_PLOTS_TABLE_SQL = """
@@ -175,13 +176,13 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
                 if (ownerRaw != null && !ownerRaw.isBlank()) {
                     try {
                         String ownerName = rs.getString("owner_name");
-                        plot.setOwner(UUID.fromString(ownerRaw), ownerName == null || ownerName.isBlank() ? null : ownerName);
+                        plot = plot.withOwner(UUID.fromString(ownerRaw), ownerName == null || ownerName.isBlank() ? null : ownerName);
                     } catch (IllegalArgumentException ex) {
                         logger.warn("Invalid owner uuid {} for plot {} in {}", ownerRaw, id.asString(), worldName);
                     }
                 }
                 if (rs.getInt("home") == 1 && plot.isClaimed()) {
-                    plot.setHome(true);
+                    plot = plot.withHome(true);
                 }
                 result.computeIfAbsent(worldName, key -> new HashMap<>()).put(id, plot);
             }
@@ -194,24 +195,18 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                Plot plot = resolvePlot(result, rs.getString("world_name"), rs.getInt("plot_x"), rs.getInt("plot_z"));
-                if (plot == null) {
-                    continue;
-                }
                 String raw = rs.getString("player_uuid");
                 if (raw == null || raw.isBlank()) {
                     continue;
                 }
                 try {
                     UUID uuid = UUID.fromString(raw);
-                    if (trusted) {
-                        plot.addTrusted(uuid);
-                    } else {
-                        plot.addDenied(uuid);
-                    }
+                    updatePlot(result, rs.getString("world_name"), rs.getInt("plot_x"), rs.getInt("plot_z"),
+                            plot -> trusted ? plot.withTrustedAdded(uuid) : plot.withDeniedAdded(uuid));
                 } catch (IllegalArgumentException ex) {
                     logger.warn("Invalid {} uuid {} for plot {} in {}", trusted ? "trusted" : "denied", raw,
-                            plot.getId().asString(), plot.getWorldName());
+                            new PlotId(rs.getInt("plot_x"), rs.getInt("plot_z")).asString(),
+                            rs.getString("world_name"));
                 }
             }
         }
@@ -222,16 +217,13 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                Plot plot = resolvePlot(result, rs.getString("world_name"), rs.getInt("plot_x"), rs.getInt("plot_z"));
-                if (plot == null) {
-                    continue;
-                }
                 String key = rs.getString("flag_key");
                 String value = rs.getString("flag_value");
                 if (key == null || key.isBlank() || value == null || value.isBlank()) {
                     continue;
                 }
-                plot.setFlagRaw(key, value);
+                updatePlot(result, rs.getString("world_name"), rs.getInt("plot_x"), rs.getInt("plot_z"),
+                        plot -> plot.withFlagRaw(key, value));
             }
         }
     }
@@ -241,33 +233,45 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                Plot plot = resolvePlot(result, rs.getString("world_name"), rs.getInt("plot_x"), rs.getInt("plot_z"));
-                if (plot == null) {
-                    continue;
-                }
                 String raw = rs.getString("direction");
                 PlotMergeDirection direction = PlotMergeDirection.fromString(raw);
                 if (direction == null) {
                     if (raw != null && !raw.isBlank()) {
-                        logger.warn("Invalid merge direction {} for plot {} in {}", raw, plot.getId().asString(),
-                                plot.getWorldName());
+                        logger.warn("Invalid merge direction {} for plot {} in {}", raw,
+                                new PlotId(rs.getInt("plot_x"), rs.getInt("plot_z")).asString(),
+                                rs.getString("world_name"));
                     }
                     continue;
                 }
-                plot.addMergedDirection(direction);
+                updatePlot(result, rs.getString("world_name"), rs.getInt("plot_x"), rs.getInt("plot_z"),
+                        plot -> plot.withMergedDirectionAdded(direction));
             }
         }
     }
 
-    private Plot resolvePlot(Map<String, Map<PlotId, Plot>> result, String worldName, int plotX, int plotZ) {
+    private void updatePlot(
+            Map<String, Map<PlotId, Plot>> result,
+            String worldName,
+            int plotX,
+            int plotZ,
+            UnaryOperator<Plot> updater
+    ) {
         if (worldName == null || worldName.isBlank()) {
-            return null;
+            return;
         }
         Map<PlotId, Plot> worldPlots = result.get(worldName);
         if (worldPlots == null) {
-            return null;
+            return;
         }
-        return worldPlots.get(new PlotId(plotX, plotZ));
+        PlotId id = new PlotId(plotX, plotZ);
+        Plot plot = worldPlots.get(id);
+        if (plot == null) {
+            return;
+        }
+        Plot updated = updater.apply(plot);
+        if (updated != plot) {
+            worldPlots.put(id, updated);
+        }
     }
 
     private void pruneDefaults(Map<String, Map<PlotId, Plot>> result) {

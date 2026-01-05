@@ -51,7 +51,7 @@ public final class YamlPlotStorage implements PlotStorage {
                 if (!ownerRaw.isBlank()) {
                     try {
                         String ownerName = plotSection.getString("ownerName", "");
-                        plot.setOwner(UUID.fromString(ownerRaw), ownerName.isBlank() ? null : ownerName);
+                        plot = plot.withOwner(UUID.fromString(ownerRaw), ownerName.isBlank() ? null : ownerName);
                     } catch (IllegalArgumentException ex) {
                         logger.warn("Invalid owner uuid {} for plot {} in {}", ownerRaw, plotKey, worldName);
                     }
@@ -59,7 +59,7 @@ public final class YamlPlotStorage implements PlotStorage {
 
                 for (String raw : plotSection.getStringList("trusted")) {
                     try {
-                        plot.addTrusted(UUID.fromString(raw));
+                        plot = plot.withTrustedAdded(UUID.fromString(raw));
                     } catch (IllegalArgumentException ex) {
                         logger.warn("Invalid trusted uuid {} for plot {} in {}", raw, plotKey, worldName);
                     }
@@ -67,28 +67,28 @@ public final class YamlPlotStorage implements PlotStorage {
 
                 for (String raw : plotSection.getStringList("denied")) {
                     try {
-                        plot.addDenied(UUID.fromString(raw));
+                        plot = plot.withDeniedAdded(UUID.fromString(raw));
                     } catch (IllegalArgumentException ex) {
                         logger.warn("Invalid denied uuid {} for plot {} in {}", raw, plotKey, worldName);
                     }
                 }
 
                 if (plot.isClaimed() && plotSection.getBoolean("home", false)) {
-                    plot.setHome(true);
+                    plot = plot.withHome(true);
                 }
 
                 ConfigSection flagsSection = plotSection.getSection("flags");
                 for (String flagKey : flagsSection.getKeys(false)) {
                     String value = flagsSection.getString(flagKey, "");
                     if (!value.isBlank()) {
-                        plot.setFlagRaw(flagKey, value);
+                        plot = plot.withFlagRaw(flagKey, value);
                     }
                 }
 
                 for (String raw : plotSection.getStringList("merged")) {
                     PlotMergeDirection direction = PlotMergeDirection.fromString(raw);
                     if (direction != null) {
-                        plot.addMergedDirection(direction);
+                        plot = plot.withMergedDirectionAdded(direction);
                     } else if (raw != null && !raw.isBlank()) {
                         logger.warn("Invalid merged direction {} for plot {} in {}", raw, plotKey, worldName);
                     }

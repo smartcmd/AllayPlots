@@ -3,10 +3,12 @@ package me.daoge.allayplots.plot;
 import me.daoge.allayplots.config.PlotWorldConfig;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class PlotWorld {
     private final PlotWorldConfig config;
-    private final Map<PlotId, Plot> plots = new HashMap<>();
+    private final Map<PlotId, Plot> plots = new ConcurrentHashMap<>();
+    private final Map<PlotId, Plot> plotsView = Collections.unmodifiableMap(plots);
 
     public PlotWorld(PlotWorldConfig config) {
         this.config = config;
@@ -17,7 +19,19 @@ public final class PlotWorld {
     }
 
     public Map<PlotId, Plot> getPlots() {
-        return plots;
+        return plotsView;
+    }
+
+    void putPlots(Map<PlotId, Plot> plots) {
+        this.plots.putAll(plots);
+    }
+
+    void putPlot(PlotId id, Plot plot) {
+        if (plot == null) {
+            plots.remove(id);
+            return;
+        }
+        plots.put(id, plot);
     }
 
     /**
@@ -108,9 +122,10 @@ public final class PlotWorld {
     }
 
     public Plot claimPlot(PlotId id, UUID owner, String ownerName) {
-        Plot plot = plots.computeIfAbsent(id, key -> new Plot(config.worldName(), key));
-        plot.setOwner(owner, ownerName);
-        return plot;
+        return plots.compute(id, (key, existing) -> {
+            Plot base = existing == null ? new Plot(config.worldName(), key) : existing;
+            return base.withOwner(owner, ownerName);
+        });
     }
 
     public void removePlot(PlotId id) {
@@ -166,12 +181,14 @@ public final class PlotWorld {
         if (neighbor == null) return false;
 
         if (merged) {
-            plot.addMergedDirection(direction);
-            neighbor.addMergedDirection(direction.opposite());
+            plot = plot.withMergedDirectionAdded(direction);
+            neighbor = neighbor.withMergedDirectionAdded(direction.opposite());
         } else {
-            plot.removeMergedDirection(direction);
-            neighbor.removeMergedDirection(direction.opposite());
+            plot = plot.withMergedDirectionRemoved(direction);
+            neighbor = neighbor.withMergedDirectionRemoved(direction.opposite());
         }
+        plots.put(id, plot);
+        plots.put(neighborId, neighbor);
         return true;
     }
 
@@ -181,11 +198,20 @@ public final class PlotWorld {
             PlotId neighborId = getAdjacentPlotId(id, dir);
             Plot neighbor = plots.get(neighborId);
             if (neighbor != null) {
-                neighbor.removeMergedDirection(dir.opposite());
+                Plot updated = neighbor.withMergedDirectionRemoved(dir.opposite());
+                if (updated != neighbor) {
+                    plots.put(neighborId, updated);
+                }
             }
             if (plot != null) {
-                plot.removeMergedDirection(dir);
+                Plot updated = plot.withMergedDirectionRemoved(dir);
+                if (updated != plot) {
+                    plot = updated;
+                }
             }
+        }
+        if (plot != null) {
+            plots.put(id, plot);
         }
     }
 
@@ -234,6 +260,7 @@ public final class PlotWorld {
         for (Map.Entry<PlotId, Plot> entry : plots.entrySet()) {
             PlotId id = entry.getKey();
             Plot plot = entry.getValue();
+            Plot updated = plot;
 
             for (PlotMergeDirection dir : Set.copyOf(plot.getMergedDirections())) {
                 PlotId neighborId = getAdjacentPlotId(id, dir);
@@ -245,14 +272,22 @@ public final class PlotWorld {
                              && Objects.equals(plot.getOwner(), neighbor.getOwner());
 
                 if (!ok) {
-                    plot.removeMergedDirection(dir);
-                    if (neighbor != null) neighbor.removeMergedDirection(dir.opposite());
+                    updated = updated.withMergedDirectionRemoved(dir);
+                    if (neighbor != null) {
+                        Plot updatedNeighbor = neighbor.withMergedDirectionRemoved(dir.opposite());
+                        if (updatedNeighbor != neighbor) {
+                            plots.put(neighborId, updatedNeighbor);
+                        }
+                    }
                     continue;
                 }
 
                 if (!neighbor.isMerged(dir.opposite())) {
-                    plot.removeMergedDirection(dir);
+                    updated = updated.withMergedDirectionRemoved(dir);
                 }
+            }
+            if (updated != plot) {
+                plots.put(id, updated);
             }
         }
     }

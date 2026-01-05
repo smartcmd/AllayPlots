@@ -42,6 +42,7 @@ public final class AllayPlotsPlugin extends Plugin {
 
         config = PluginConfig.load(dataFolder, this.pluginLogger);
         plotService = new PlotService(config, createStorage(dataFolder), this.pluginLogger);
+        plotService.start();
         plotService.load();
 
         ensurePlotWorldsLoaded();
@@ -55,7 +56,7 @@ public final class AllayPlotsPlugin extends Plugin {
         Registries.COMMANDS.register(new PlotCommand(plotService, config, messageService, this.pluginLogger));
 
         if (config.settings().autoSaveIntervalTicks() > 0) {
-            Server.getInstance().getScheduler().scheduleRepeating(this, plotService::save, config.settings().autoSaveIntervalTicks());
+            Server.getInstance().getScheduler().scheduleRepeating(this, plotService::requestSave, config.settings().autoSaveIntervalTicks());
         }
 
         this.pluginLogger.info("AllayPlots enabled for {} plot worlds.", plotService.worldCount());
@@ -65,6 +66,7 @@ public final class AllayPlotsPlugin extends Plugin {
     public void onDisable() {
         if (plotService != null) {
             plotService.save();
+            plotService.shutdown();
         }
     }
 

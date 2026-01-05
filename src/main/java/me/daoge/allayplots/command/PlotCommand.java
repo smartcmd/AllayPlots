@@ -23,7 +23,6 @@ import org.slf4j.Logger;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 public final class PlotCommand extends Command {
@@ -129,35 +128,34 @@ public final class PlotCommand extends Command {
         PlotContext pc = resolvePlotContext(context, player);
         if (pc == null) return context.fail();
 
-        Plot plot = requireOwnedPlot(context, player, pc);
-        if (plot == null) return context.fail();
+        if (requireOwnedPlot(context, player, pc) == null) return context.fail();
 
         PlotMergeDirection dir = resolveMergeDirection(context, player);
         PlotId targetId = pc.world().getAdjacentPlotId(pc.plotId(), dir);
-        Plot targetPlot = pc.world().getPlot(targetId);
 
-        if (targetPlot == null || !targetPlot.isClaimed()) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_TARGET_UNCLAIMED));
-            return context.fail();
-        }
-        if (!Objects.equals(plot.getOwner(), targetPlot.getOwner())) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_NOT_SAME_OWNER));
-            return context.fail();
-        }
-        if (pc.world().isMerged(pc.plotId(), dir)) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_ALREADY));
-            return context.fail();
-        }
-        if (!pc.world().setMerged(pc.plotId(), dir, true)) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_FAILED));
-            return context.fail();
-        }
-
-        plotService.syncPlotSettings(pc.world(), pc.plotId(), plot);
-        plotService.updateMergeRoads(pc.world(), pc.plotId(), dir);
-
-        context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_SUCCESS, targetId.x(), targetId.z()));
-        return context.success();
+        PlotService.MergeResult result = plotService.mergePlots(pc.world(), pc.plotId(), dir);
+        return switch (result) {
+            case SUCCESS -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_SUCCESS, targetId.x(), targetId.z()));
+                yield context.success();
+            }
+            case TARGET_UNCLAIMED -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_TARGET_UNCLAIMED));
+                yield context.fail();
+            }
+            case NOT_SAME_OWNER -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_NOT_SAME_OWNER));
+                yield context.fail();
+            }
+            case ALREADY_MERGED -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_ALREADY));
+                yield context.fail();
+            }
+            case FAILED -> {
+                context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_FAILED));
+                yield context.fail();
+            }
+        };
     }
 
     private CommandResult handleUnmerge(CommandContext context, EntityPlayer player) {
@@ -167,13 +165,10 @@ public final class PlotCommand extends Command {
         if (requireOwnedPlot(context, player, pc) == null) return context.fail();
 
         PlotMergeDirection dir = resolveMergeDirection(context, player);
-        if (!pc.world().isMerged(pc.plotId(), dir)) {
+        if (!plotService.unmergePlots(pc.world(), pc.plotId(), dir)) {
             context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_NOT_MERGED));
             return context.fail();
         }
-
-        pc.world().setMerged(pc.plotId(), dir, false);
-        plotService.updateMergeRoads(pc.world(), pc.plotId(), dir);
 
         PlotId targetId = pc.world().getAdjacentPlotId(pc.plotId(), dir);
         context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_SUCCESS, targetId.x(), targetId.z()));
@@ -282,10 +277,9 @@ public final class PlotCommand extends Command {
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        plotService.applyToMergeGroup(pt.world(), pt.plotId(), plot -> {
-            plot.addTrusted(target.getUniqueId());
-            plot.getDenied().remove(target.getUniqueId());
-        });
+        plotService.updateMergeGroup(pt.world(), pt.plotId(), plot -> plot
+                .withTrustedAdded(target.getUniqueId())
+                .withDeniedRemoved(target.getUniqueId()));
 
         context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_ADDED, target.getDisplayName()));
         return context.success();
@@ -296,7 +290,7 @@ public final class PlotCommand extends Command {
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        plotService.applyToMergeGroup(pt.world(), pt.plotId(), plot -> plot.removeTrusted(target.getUniqueId()));
+        plotService.updateMergeGroup(pt.world(), pt.plotId(), plot -> plot.withTrustedRemoved(target.getUniqueId()));
 
         context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_REMOVED, target.getDisplayName()));
         return context.success();
@@ -307,10 +301,9 @@ public final class PlotCommand extends Command {
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        plotService.applyToMergeGroup(pt.world(), pt.plotId(), plot -> {
-            plot.addDenied(target.getUniqueId());
-            plot.getTrusted().remove(target.getUniqueId());
-        });
+        plotService.updateMergeGroup(pt.world(), pt.plotId(), plot -> plot
+                .withDeniedAdded(target.getUniqueId())
+                .withTrustedRemoved(target.getUniqueId()));
 
         context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_ADDED, target.getDisplayName()));
         return context.success();
@@ -321,7 +314,7 @@ public final class PlotCommand extends Command {
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        plotService.applyToMergeGroup(pt.world(), pt.plotId(), plot -> plot.removeDenied(target.getUniqueId()));
+        plotService.updateMergeGroup(pt.world(), pt.plotId(), plot -> plot.withDeniedRemoved(target.getUniqueId()));
 
         context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_REMOVED, target.getDisplayName()));
         return context.success();
@@ -364,7 +357,7 @@ public final class PlotCommand extends Command {
         if (requireOwnedPlot(context, player, pc) == null) return context.fail();
 
         if (PlotFlagValue.isReset(rawValue)) {
-            plotService.applyToMergeGroup(pc.world(), pc.plotId(), p -> p.removeFlag(flag.getLowerCaseName()));
+            plotService.updateMergeGroup(pc.world(), pc.plotId(), p -> p.withoutFlag(flag.getLowerCaseName()));
             context.addOutput(messages.render(
                     player,
                     LangKeys.MESSAGE_FLAG_RESET,
@@ -380,7 +373,7 @@ public final class PlotCommand extends Command {
             return context.fail();
         }
 
-        plotService.applyToMergeGroup(pc.world(), pc.plotId(), p -> p.setFlag(flag, parsed));
+        plotService.updateMergeGroup(pc.world(), pc.plotId(), p -> p.withFlag(flag, parsed));
         context.addOutput(messages.render(
                 player,
                 LangKeys.MESSAGE_FLAG_SET,
@@ -491,7 +484,6 @@ public final class PlotCommand extends Command {
         }
 
         Plot claimed = plotService.claimPlot(pc.world(), pc.plotId(), player.getUniqueId(), resolveOwnerName(player));
-        claimed.getDenied().remove(player.getUniqueId());
 
         new PlotClaimEvent(player, pc.world(), claimed).call();
 

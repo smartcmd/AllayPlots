@@ -5,17 +5,38 @@ import java.util.*;
 public final class Plot {
     private final String worldName;
     private final PlotId id;
-    private UUID owner;
-    private String ownerName;
-    private boolean home;
-    private final Set<UUID> trusted = new HashSet<>();
-    private final Set<UUID> denied = new HashSet<>();
-    private final Map<String, String> flags = new HashMap<>();
-    private final Set<PlotMergeDirection> mergedDirections = new HashSet<>();
+    private final UUID owner;
+    private final String ownerName;
+    private final boolean home;
+    private final Set<UUID> trusted;
+    private final Set<UUID> denied;
+    private final Map<String, String> flags;
+    private final Set<PlotMergeDirection> mergedDirections;
 
     public Plot(String worldName, PlotId id) {
-        this.worldName = worldName;
-        this.id = id;
+        this(worldName, id, null, null, false, Set.of(), Set.of(), Map.of(), Set.of());
+    }
+
+    private Plot(
+            String worldName,
+            PlotId id,
+            UUID owner,
+            String ownerName,
+            boolean home,
+            Set<UUID> trusted,
+            Set<UUID> denied,
+            Map<String, String> flags,
+            Set<PlotMergeDirection> mergedDirections
+    ) {
+        this.worldName = Objects.requireNonNull(worldName, "worldName");
+        this.id = Objects.requireNonNull(id, "id");
+        this.owner = owner;
+        this.ownerName = ownerName;
+        this.home = home;
+        this.trusted = Set.copyOf(trusted);
+        this.denied = Set.copyOf(denied);
+        this.flags = Map.copyOf(flags);
+        this.mergedDirections = Set.copyOf(mergedDirections);
     }
 
     public String getWorldName() {
@@ -30,25 +51,24 @@ public final class Plot {
         return owner;
     }
 
-    public void setOwner(UUID owner, String ownerName) {
-        UUID previousOwner = this.owner;
-        this.owner = owner;
-        if (!Objects.equals(previousOwner, owner)) {
-            trusted.clear();
-            denied.clear();
-            flags.clear();
-            mergedDirections.clear();
-            home = false;
+    public Plot withOwner(UUID owner, String ownerName) {
+        if (!Objects.equals(this.owner, owner)) {
+            if (owner == null) {
+                return new Plot(worldName, id, null, null, false, Set.of(), Set.of(), Map.of(), Set.of());
+            }
+            return new Plot(worldName, id, owner, ownerName, false, Set.of(), Set.of(), Map.of(), Set.of());
         }
         if (owner == null) {
-            this.ownerName = null;
-        } else {
-            this.ownerName = ownerName;
+            return this;
         }
+        if (Objects.equals(this.ownerName, ownerName)) {
+            return this;
+        }
+        return new Plot(worldName, id, owner, ownerName, home, trusted, denied, flags, mergedDirections);
     }
 
-    public void setOwner(UUID owner) {
-        setOwner(owner, null);
+    public Plot withOwner(UUID owner) {
+        return withOwner(owner, null);
     }
 
     public String getOwnerName() {
@@ -59,10 +79,11 @@ public final class Plot {
         return ownerName != null ? ownerName : owner.toString();
     }
 
-    public void setOwnerName(String ownerName) {
-        if (owner != null) {
-            this.ownerName = ownerName;
+    public Plot withOwnerName(String ownerName) {
+        if (owner == null || Objects.equals(this.ownerName, ownerName)) {
+            return this;
         }
+        return new Plot(worldName, id, owner, ownerName, home, trusted, denied, flags, mergedDirections);
     }
 
     public boolean isClaimed() {
@@ -85,8 +106,11 @@ public final class Plot {
         return home;
     }
 
-    public void setHome(boolean home) {
-        this.home = home;
+    public Plot withHome(boolean home) {
+        if (this.home == home) {
+            return this;
+        }
+        return new Plot(worldName, id, owner, ownerName, home, trusted, denied, flags, mergedDirections);
     }
 
     public Map<String, String> getFlags() {
@@ -101,20 +125,29 @@ public final class Plot {
         return mergedDirections.contains(direction);
     }
 
-    public void addMergedDirection(PlotMergeDirection direction) {
-        if (direction != null) {
-            mergedDirections.add(direction);
+    public Plot withMergedDirectionAdded(PlotMergeDirection direction) {
+        if (direction == null || mergedDirections.contains(direction)) {
+            return this;
         }
+        Set<PlotMergeDirection> updated = new HashSet<>(mergedDirections);
+        updated.add(direction);
+        return new Plot(worldName, id, owner, ownerName, home, trusted, denied, flags, updated);
     }
 
-    public void removeMergedDirection(PlotMergeDirection direction) {
-        if (direction != null) {
-            mergedDirections.remove(direction);
+    public Plot withMergedDirectionRemoved(PlotMergeDirection direction) {
+        if (direction == null || !mergedDirections.contains(direction)) {
+            return this;
         }
+        Set<PlotMergeDirection> updated = new HashSet<>(mergedDirections);
+        updated.remove(direction);
+        return new Plot(worldName, id, owner, ownerName, home, trusted, denied, flags, updated);
     }
 
-    public void clearMergedDirections() {
-        mergedDirections.clear();
+    public Plot withMergedDirectionsCleared() {
+        if (mergedDirections.isEmpty()) {
+            return this;
+        }
+        return new Plot(worldName, id, owner, ownerName, home, trusted, denied, flags, Set.of());
     }
 
     public boolean getFlag(PlotFlag flag) {
@@ -127,43 +160,92 @@ public final class Plot {
         return flags.get(key);
     }
 
-    public void setFlagRaw(String key, String value) {
+    public Plot withFlagRaw(String key, String value) {
         if (key == null || key.isBlank()) {
-            return;
+            return this;
         }
+        Map<String, String> updated = new HashMap<>(flags);
         if (value == null || value.isBlank()) {
-            flags.remove(key);
-            return;
+            if (!updated.containsKey(key)) {
+                return this;
+            }
+            updated.remove(key);
+        } else {
+            if (value.equals(updated.get(key))) {
+                return this;
+            }
+            updated.put(key, value);
         }
-        flags.put(key, value);
+        return new Plot(worldName, id, owner, ownerName, home, trusted, denied, updated, mergedDirections);
     }
 
-    public void setFlag(PlotFlag flag, boolean value) {
+    public Plot withFlag(PlotFlag flag, boolean value) {
         if (value == flag.defaultValue()) {
-            flags.remove(flag.getLowerCaseName());
-            return;
+            return withoutFlag(flag.getLowerCaseName());
         }
-        flags.put(flag.getLowerCaseName(), value ? "true" : "false");
+        String key = flag.getLowerCaseName();
+        String raw = value ? "true" : "false";
+        if (raw.equals(flags.get(key))) {
+            return this;
+        }
+        Map<String, String> updated = new HashMap<>(flags);
+        updated.put(key, raw);
+        return new Plot(worldName, id, owner, ownerName, home, trusted, denied, updated, mergedDirections);
     }
 
-    public void removeFlag(String key) {
-        flags.remove(key);
+    public Plot withoutFlag(String key) {
+        if (key == null || key.isBlank() || !flags.containsKey(key)) {
+            return this;
+        }
+        Map<String, String> updated = new HashMap<>(flags);
+        updated.remove(key);
+        return new Plot(worldName, id, owner, ownerName, home, trusted, denied, updated, mergedDirections);
     }
 
-    public boolean addTrusted(UUID playerId) {
-        return trusted.add(playerId);
+    public Plot withTrustedAdded(UUID playerId) {
+        if (playerId == null || trusted.contains(playerId)) {
+            return this;
+        }
+        Set<UUID> updated = new HashSet<>(trusted);
+        updated.add(playerId);
+        return new Plot(worldName, id, owner, ownerName, home, updated, denied, flags, mergedDirections);
     }
 
-    public boolean removeTrusted(UUID playerId) {
-        return trusted.remove(playerId);
+    public Plot withTrustedRemoved(UUID playerId) {
+        if (playerId == null || !trusted.contains(playerId)) {
+            return this;
+        }
+        Set<UUID> updated = new HashSet<>(trusted);
+        updated.remove(playerId);
+        return new Plot(worldName, id, owner, ownerName, home, updated, denied, flags, mergedDirections);
     }
 
-    public boolean addDenied(UUID playerId) {
-        return denied.add(playerId);
+    public Plot withDeniedAdded(UUID playerId) {
+        if (playerId == null || denied.contains(playerId)) {
+            return this;
+        }
+        Set<UUID> updated = new HashSet<>(denied);
+        updated.add(playerId);
+        return new Plot(worldName, id, owner, ownerName, home, trusted, updated, flags, mergedDirections);
     }
 
-    public boolean removeDenied(UUID playerId) {
-        return denied.remove(playerId);
+    public Plot withDeniedRemoved(UUID playerId) {
+        if (playerId == null || !denied.contains(playerId)) {
+            return this;
+        }
+        Set<UUID> updated = new HashSet<>(denied);
+        updated.remove(playerId);
+        return new Plot(worldName, id, owner, ownerName, home, trusted, updated, flags, mergedDirections);
+    }
+
+    public Plot withSettingsFrom(Plot source) {
+        if (source == null) {
+            return this;
+        }
+        if (trusted.equals(source.trusted) && denied.equals(source.denied) && flags.equals(source.flags)) {
+            return this;
+        }
+        return new Plot(worldName, id, owner, ownerName, home, source.trusted, source.denied, source.flags, mergedDirections);
     }
 
     public boolean canEnter(UUID playerId) {

@@ -70,6 +70,7 @@ Perfect for survival servers, creative building communities, and any server need
 | `/plot info`                | Show current plot information                    | `allayplots.info`    |
 | `/plot home [player]`       | Teleport to your plot home (or another player's) | `allayplots.home`    |
 | `/plot sethome`             | Set plot home to current location                | `allayplots.sethome` |
+| `/plot setowner <player>`   | Set plot owner (admin)                           | `allayplots.admin.bypass` |
 | `/plot trust <player>`      | Trust a player on your plot                      | `allayplots.trust`   |
 | `/plot untrust <player>`    | Remove a trusted player                          | `allayplots.untrust` |
 | `/plot deny <player>`       | Deny a player from your plot                     | `allayplots.deny`    |
@@ -97,13 +98,15 @@ The config file is created at `plugins/AllayPlots/config.yml`.
 ```yaml
 worlds:
   plotworld:  # World name
-    plot-size: 35              # Size of each plot (including road)
-    road-size: 7               # Width of roads between plots
+    plot-size: 35              # Plot size (inside area, excluding roads)
+    road-size: 7               # Road width between plots
     ground-y: 64               # Y-level for plot generation
     max-plots-per-player: 2    # Plots limit per player
     claim-price: 100.0         # Cost to claim a plot
     sell-refund: 50.0          # Refund when deleting
     teleport-on-claim: true    # TP to plot on claim
+    plot-block: minecraft:grass_block
+    road-block: minecraft:oak_planks
     road-edge-block: minecraft:smooth_stone_slab
     road-corner-block: minecraft:smooth_stone_slab
 ```
@@ -112,7 +115,7 @@ worlds:
 
 ```yaml
 economy:
-  enabled: true    # Enable economy features
+  enabled: false   # Enable economy features
   currency: ""     # Custom currency name (empty = default)
 ```
 
@@ -146,7 +149,7 @@ AllayPlots provides custom events for other plugins to hook into:
 
 ```bash
 # Clone the repository
-git clone https://github.com/YourUsername/AllayPlots.git
+git clone https://github.com/smartcmd/AllayPlots.git
 cd AllayPlots
 
 # Build with Gradle
@@ -157,7 +160,7 @@ cd AllayPlots
 
 **Requirements:**
 - Java 21 or higher
-- Gradle
+- Gradle wrapper (`./gradlew`)
 
 ## 🤝 Contributing
 

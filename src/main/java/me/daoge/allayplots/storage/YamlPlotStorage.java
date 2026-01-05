@@ -22,7 +22,6 @@ public final class YamlPlotStorage implements PlotStorage {
     @Override
     public Map<String, Map<PlotId, Plot>> load() {
         ConfigSection defaults = new ConfigSection();
-        defaults.set("version", 1);
         defaults.set("worlds", new ConfigSection());
 
         Config config = new Config(file.toFile(), Config.YAML, defaults);
@@ -109,8 +108,6 @@ public final class YamlPlotStorage implements PlotStorage {
     @Override
     public void save(Map<String, Map<PlotId, Plot>> worlds) {
         ConfigSection root = new ConfigSection();
-        root.set("version", 1);
-
         ConfigSection worldsSection = new ConfigSection();
         for (Map.Entry<String, Map<PlotId, Plot>> entry : worlds.entrySet()) {
             ConfigSection worldSection = new ConfigSection();

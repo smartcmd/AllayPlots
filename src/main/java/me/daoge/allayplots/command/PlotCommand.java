@@ -134,7 +134,7 @@ public final class PlotCommand extends Command {
         PlotMergeDirection dir = resolveMergeDirection(context, player);
         PlotId targetId = pc.world().getAdjacentPlotId(pc.plotId(), dir);
 
-        boolean bypass = player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean();
+        boolean bypass = hasAdminBypass(player);
         PlotService.MergeResult result = plotService.mergePlots(
                 pc.world(),
                 pc.plotId(),
@@ -179,7 +179,7 @@ public final class PlotCommand extends Command {
         if (pc == null) return context.fail();
 
         PlotMergeDirection dir = resolveMergeDirection(context, player);
-        boolean bypass = player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean();
+        boolean bypass = hasAdminBypass(player);
         PlotService.UnmergeResult result = plotService.unmergePlots(
                 pc.world(),
                 pc.plotId(),
@@ -260,7 +260,7 @@ public final class PlotCommand extends Command {
 
         EntityPlayer target = targets.getFirst();
         boolean same = target.getUniqueId().equals(player.getUniqueId());
-        if (!same && !player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
+        if (!same && !hasAdminBypass(player)) {
             context.addOutput(messages.render(player, LangKeys.MESSAGE_NO_PERMISSION));
             return context.fail();
         }
@@ -292,7 +292,7 @@ public final class PlotCommand extends Command {
         EntityPlayer target = resolveSingleTarget(context, 1);
         if (target == null) return context.fail();
 
-        boolean bypass = player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean();
+        boolean bypass = hasAdminBypass(player);
         PlotService.OwnerActionResult result = plotService.setPlotOwner(
                 pc.world(),
                 pc.plotId(),
@@ -319,18 +319,14 @@ public final class PlotCommand extends Command {
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
-                pt.world(),
-                pt.plotId(),
-                player.getUniqueId(),
-                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+        return handleAccessUpdate(
+                context,
+                player,
+                pt,
                 plot -> plot.withTrustedAdded(target.getUniqueId())
-                            .withDeniedRemoved(target.getUniqueId())
+                            .withDeniedRemoved(target.getUniqueId()),
+                LangKeys.MESSAGE_TRUST_ADDED
         );
-        if (!handleOwnerResult(context, player, result)) return context.fail();
-
-        context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_ADDED, target.getDisplayName()));
-        return context.success();
     }
 
     private CommandResult handleUntrust(CommandContext context, EntityPlayer player) {
@@ -338,17 +334,13 @@ public final class PlotCommand extends Command {
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
-                pt.world(),
-                pt.plotId(),
-                player.getUniqueId(),
-                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
-                plot -> plot.withTrustedRemoved(target.getUniqueId())
+        return handleAccessUpdate(
+                context,
+                player,
+                pt,
+                plot -> plot.withTrustedRemoved(target.getUniqueId()),
+                LangKeys.MESSAGE_TRUST_REMOVED
         );
-        if (!handleOwnerResult(context, player, result)) return context.fail();
-
-        context.addOutput(messages.render(player, LangKeys.MESSAGE_TRUST_REMOVED, target.getDisplayName()));
-        return context.success();
     }
 
     private CommandResult handleDeny(CommandContext context, EntityPlayer player) {
@@ -356,18 +348,14 @@ public final class PlotCommand extends Command {
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
-                pt.world(),
-                pt.plotId(),
-                player.getUniqueId(),
-                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+        return handleAccessUpdate(
+                context,
+                player,
+                pt,
                 plot -> plot.withDeniedAdded(target.getUniqueId())
-                            .withTrustedRemoved(target.getUniqueId())
+                            .withTrustedRemoved(target.getUniqueId()),
+                LangKeys.MESSAGE_DENY_ADDED
         );
-        if (!handleOwnerResult(context, player, result)) return context.fail();
-
-        context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_ADDED, target.getDisplayName()));
-        return context.success();
     }
 
     private CommandResult handleUndeny(CommandContext context, EntityPlayer player) {
@@ -375,17 +363,13 @@ public final class PlotCommand extends Command {
         if (pt == null) return context.fail();
 
         EntityPlayer target = pt.target();
-        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
-                pt.world(),
-                pt.plotId(),
-                player.getUniqueId(),
-                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
-                plot -> plot.withDeniedRemoved(target.getUniqueId())
+        return handleAccessUpdate(
+                context,
+                player,
+                pt,
+                plot -> plot.withDeniedRemoved(target.getUniqueId()),
+                LangKeys.MESSAGE_DENY_REMOVED
         );
-        if (!handleOwnerResult(context, player, result)) return context.fail();
-
-        context.addOutput(messages.render(player, LangKeys.MESSAGE_DENY_REMOVED, target.getDisplayName()));
-        return context.success();
     }
 
     private CommandResult handleFlag(CommandContext context, EntityPlayer player) {
@@ -427,7 +411,7 @@ public final class PlotCommand extends Command {
                     pc.world(),
                     pc.plotId(),
                     player.getUniqueId(),
-                    player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+                    hasAdminBypass(player),
                     p -> p.withoutFlag(flag.getLowerCaseName())
             );
             if (!handleOwnerResult(context, player, result)) return context.fail();
@@ -450,7 +434,7 @@ public final class PlotCommand extends Command {
                 pc.world(),
                 pc.plotId(),
                 player.getUniqueId(),
-                player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean(),
+                hasAdminBypass(player),
                 p -> p.withFlag(flag, parsed)
         );
         if (!handleOwnerResult(context, player, result)) return context.fail();
@@ -598,13 +582,13 @@ public final class PlotCommand extends Command {
     private boolean shouldChargeOnClaim(EntityPlayer player, PlotWorldConfig wc) {
         return economyEnabled
                && wc.claimPrice() > 0
-               && !player.hasPermission(Permissions.ECONOMY_BYPASS).asBoolean();
+               && !hasEconomyBypass(player);
     }
 
     private boolean shouldRefundOnDelete(EntityPlayer player, PlotWorldConfig wc) {
         return economyEnabled
                && wc.sellRefund() > 0
-               && !player.hasPermission(Permissions.ECONOMY_BYPASS).asBoolean();
+               && !hasEconomyBypass(player);
     }
 
     private boolean withdraw(UUID uuid, BigDecimal amount) {
@@ -627,7 +611,7 @@ public final class PlotCommand extends Command {
         Plot plot = location.plot();
         if (plot != null
             && !plot.canEnter(player.getUniqueId())
-            && !player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
+            && !hasAdminBypass(player)) {
             context.addOutput(messages.render(player, LangKeys.MESSAGE_ENTER_DENIED));
             return context.fail();
         }
@@ -680,6 +664,34 @@ public final class PlotCommand extends Command {
                     .append(PlotFlagValue.format(plot.getFlag(flag)));
         }
         return builder.toString();
+    }
+
+    private CommandResult handleAccessUpdate(
+            CommandContext context,
+            EntityPlayer player,
+            PlotTarget target,
+            java.util.function.UnaryOperator<Plot> updater,
+            String messageKey
+    ) {
+        PlotService.OwnerActionResult result = plotService.updateMergeGroupOwned(
+                target.world(),
+                target.plotId(),
+                player.getUniqueId(),
+                hasAdminBypass(player),
+                updater
+        );
+        if (!handleOwnerResult(context, player, result)) return context.fail();
+
+        context.addOutput(messages.render(player, messageKey, target.target().getDisplayName()));
+        return context.success();
+    }
+
+    private boolean hasAdminBypass(EntityPlayer player) {
+        return player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean();
+    }
+
+    private boolean hasEconomyBypass(EntityPlayer player) {
+        return player.hasPermission(Permissions.ECONOMY_BYPASS).asBoolean();
     }
 
     private record PlotTarget(PlotWorld world, PlotId plotId, EntityPlayer target) {}

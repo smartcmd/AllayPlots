@@ -464,32 +464,24 @@ public final class PlotService {
     private boolean setPlotOwnerUnchecked(PlotWorld world, PlotId id, UUID newOwner, String newOwnerName) {
         Plot plot = world.getPlot(id);
         if (plot == null || !plot.isClaimed()) return false;
-        boolean changed = false;
 
         UUID oldOwner = plot.getOwner();
         if (oldOwner != null && oldOwner.equals(newOwner)) {
             Plot updated = plot.withOwner(newOwner, newOwnerName);
             if (updated != plot) {
                 world.putPlot(id, updated);
-                changed = true;
-            }
-            if (changed) {
                 markDirty();
             }
             return true;
         }
 
-        if (world.clearMergedConnections(id)) {
-            changed = true;
-        }
+        Set<PlotMergeDirection> mergedDirections = Set.copyOf(plot.getMergedDirections());
+        world.clearMergedConnections(id);
         plot = plot.withOwner(newOwner, newOwnerName);
         world.putPlot(id, plot);
-        changed = true;
 
         if (oldOwner != null) {
-            if (recomputeOwnerIndexes(oldOwner)) {
-                changed = true;
-            }
+            recomputeOwnerIndexes(oldOwner);
         }
 
         if (newOwner != null && !homeByOwner.containsKey(newOwner)) {
@@ -497,14 +489,14 @@ public final class PlotService {
             if (updated != plot) {
                 plot = updated;
                 world.putPlot(id, plot);
-                changed = true;
             }
             homeByOwner.put(newOwner, new PlotLocation(world, id));
         }
 
-        if (changed) {
-            markDirty();
+        for (PlotMergeDirection direction : mergedDirections) {
+            updateMergeRoadsInternal(world, id, direction);
         }
+        markDirty();
         return true;
     }
 
@@ -810,7 +802,8 @@ public final class PlotService {
         int maxChunkZ = maxZ >> 4;
 
         var chunkManager = dimension.getChunkManager();
-        var futures = new ArrayList<CompletableFuture<?>>();
+        int chunkCount = (maxChunkX - minChunkX + 1) * (maxChunkZ - minChunkZ + 1);
+        var futures = new ArrayList<CompletableFuture<?>>(Math.max(0, chunkCount));
 
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
             for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
@@ -832,6 +825,9 @@ public final class PlotService {
             }
         }
 
+        if (futures.isEmpty()) {
+            return;
+        }
         CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
     }
 
@@ -977,34 +973,34 @@ public final class PlotService {
 
     private record PlotMask(int minX, int minZ, int width, int depth, boolean[] mask) {
         static PlotMask build(PlotWorld world, UpdateArea area, boolean merged) {
-                int padMinX = area.minX - 1;
-                int padMaxX = area.maxX + 1;
-                int padMinZ = area.minZ - 1;
-                int padMaxZ = area.maxZ + 1;
+            int padMinX = area.minX - 1;
+            int padMaxX = area.maxX + 1;
+            int padMinZ = area.minZ - 1;
+            int padMaxZ = area.maxZ + 1;
 
-                int width = padMaxX - padMinX + 1;
-                int depth = padMaxZ - padMinZ + 1;
-                boolean[] mask = new boolean[width * depth];
+            int width = padMaxX - padMinX + 1;
+            int depth = padMaxZ - padMinZ + 1;
+            boolean[] mask = new boolean[width * depth];
 
-                for (int x = padMinX; x <= padMaxX; x++) {
-                    for (int z = padMinZ; z <= padMaxZ; z++) {
-                        boolean inStrip = merged
-                                          && x >= area.stripMinX && x <= area.stripMaxX
-                                          && z >= area.stripMinZ && z <= area.stripMaxZ;
+            for (int x = padMinX; x <= padMaxX; x++) {
+                for (int z = padMinZ; z <= padMaxZ; z++) {
+                    boolean inStrip = merged
+                                      && x >= area.stripMinX && x <= area.stripMaxX
+                                      && z >= area.stripMinZ && z <= area.stripMaxZ;
 
-                        boolean isPlot = inStrip || world.getPlotIdAt(x, z) != null;
-                        mask[(x - padMinX) * depth + (z - padMinZ)] = isPlot;
-                    }
+                    boolean isPlot = inStrip || world.getPlotIdAt(x, z) != null;
+                    mask[(x - padMinX) * depth + (z - padMinZ)] = isPlot;
                 }
-
-                return new PlotMask(padMinX, padMinZ, width, depth, mask);
             }
 
-            boolean isPlot(int x, int z) {
-                int dx = x - minX;
-                int dz = z - minZ;
-                if (dx < 0 || dz < 0 || dx >= width || dz >= depth) return false;
-                return mask[dx * depth + dz];
-            }
+            return new PlotMask(padMinX, padMinZ, width, depth, mask);
         }
+
+        boolean isPlot(int x, int z) {
+            int dx = x - minX;
+            int dz = z - minZ;
+            if (dx < 0 || dz < 0 || dx >= width || dz >= depth) return false;
+            return mask[dx * depth + dz];
+        }
+    }
 }

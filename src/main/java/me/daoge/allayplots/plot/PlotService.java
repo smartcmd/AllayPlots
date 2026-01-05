@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
@@ -71,6 +72,15 @@ public final class PlotService {
             }
         }
         saveExecutor.shutdown();
+        try {
+            if (!saveExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+                logger.warn("Plot save executor did not stop in time; forcing shutdown.");
+                saveExecutor.shutdownNow();
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            saveExecutor.shutdownNow();
+        }
     }
 
     private void runLoop() {

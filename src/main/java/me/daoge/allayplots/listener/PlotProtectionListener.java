@@ -93,6 +93,9 @@ public final class PlotProtectionListener {
         if (player.hasPermission(Permissions.ADMIN_BYPASS).asBoolean()) {
             return false;
         }
+        if (plotService.getPlotWorld(dimension) == null) {
+            return false;
+        }
         PlotService.PlotLocation location = plotService.resolvePlot(dimension, x, z);
         if (location == null) {
             if (config.settings().protectRoads()) {

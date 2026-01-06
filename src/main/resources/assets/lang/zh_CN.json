@@ -38,7 +38,7 @@
   "allayplots:message.flag_reset": "&a已将旗标 &e%1 &a重置为默认值 (&f%2&a)。",
   "allayplots:message.flag_invalid_value": "&c旗标值无效，请使用 true/false, on/off, allow/deny。",
   "allayplots:command.plot.description": "地皮管理命令",
-  "allayplots:command.plot.help": "&7命令：&eclaim&7, &eauto&7, &edelete&7, &emerge&7, &eunmerge&7, &einfo&7, &ehome&7, &esethome&7, &esetowner&7, &etrust&7, &euntrust&7, &edeny&7, &eundeny&7, &eflag",
+  "allayplots:command.plot.help": "&7命令：\n&8- &e/plot claim &7认领当前地皮\n&8- &e/plot auto &7自动认领空地皮\n&8- &e/plot delete &7删除当前地皮\n&8- &e/plot merge [direction] &7与相邻地皮合并\n&8- &e/plot unmerge [direction] &7取消相邻地皮合并\n&8- &e/plot info &7查看当前地皮信息\n&8- &e/plot list &7查看自己所有地皮\n&8- &e/plot visit <player> &7访问玩家家地皮\n&8- &e/plot visit <x> <z> &7按坐标访问地皮\n&8- &e/plot home [player] &7传送到家地皮\n&8- &e/plot sethome &7设置家地皮\n&8- &e/plot setowner <player> &7设置地皮所有者(管理员)\n&8- &e/plot trust <player> &7信任玩家\n&8- &e/plot untrust <player> &7取消信任\n&8- &e/plot deny <player> &7拒绝玩家\n&8- &e/plot undeny <player> &7取消拒绝\n&8- &e/plot flag [flag] [value] &7列出/查看/设置旗标",
   "allayplots:command.plot.info.header": "&6地皮 &e(%1, %2) &7(&f%3&7)",
   "allayplots:command.plot.info.access": "&7信任：&a%1 &8| &7拒绝：&c%2"
 }

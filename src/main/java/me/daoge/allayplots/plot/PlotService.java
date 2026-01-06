@@ -268,6 +268,13 @@ public final class PlotService {
         return new PlotLocation(world, id);
     }
 
+    public PlotLocation resolvePlot(Dimension dimension, PlotId plotId) {
+        PlotWorld world = getPlotWorld(dimension);
+        if (world == null) return null;
+
+        return new PlotLocation(world, plotId);
+    }
+
     public enum ClaimResult {
         SUCCESS,
         ALREADY_CLAIMED,

@@ -49,6 +49,12 @@ public final class PlotCommand extends Command {
         OpPermissionCalculator.NON_OP_PERMISSIONS.addAll(this.permissions);
     }
 
+    private static String resolveOwnerName(EntityPlayer player) {
+        return player.getController() != null
+                ? player.getController().getOriginName()
+                : player.getDisplayName();
+    }
+
     @Override
     public void prepareCommandTree(CommandTree tree) {
         var root = tree.getRoot();
@@ -64,6 +70,14 @@ public final class PlotCommand extends Command {
                 .exec(this::handleUnmerge, SenderType.PLAYER);
 
         root.key("info").exec(this::handleInfo, SenderType.PLAYER);
+
+        root.key("list").exec(this::handleList, SenderType.PLAYER);
+
+        var visit = root.key("visit");
+        visit.playerTarget("player")
+                .exec(this::handleVisitPlayer, SenderType.PLAYER);
+        visit.intNum("x").intNum("z")
+                .exec(this::handleVisitCoords, SenderType.PLAYER);
 
         root.key("home").playerTarget("player").optional()
                 .exec(this::handleHomeOther, SenderType.PLAYER);
@@ -83,8 +97,8 @@ public final class PlotCommand extends Command {
     }
 
     private CommandResult sendHelp(CommandContext context) {
-        EntityPlayer player = context.getSender() instanceof EntityPlayer p ? p : null;
-        context.addOutput(messages.renderInline(player, LangKeys.COMMAND_PLOT_HELP));
+        EntityPlayer player = context.getSender().isPlayer() ? context.getSender().asPlayer() : null;
+        context.getSender().sendMessage(messages.renderInline(player, LangKeys.COMMAND_PLOT_HELP));
         return context.success();
     }
 
@@ -95,7 +109,7 @@ public final class PlotCommand extends Command {
     private CommandResult handleAuto(CommandContext context, EntityPlayer player) {
         PlotWorld world = plotService.getPlotWorld(player.getDimension());
         if (world == null) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_PLOT_WORLD));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_NOT_PLOT_WORLD));
             return context.fail();
         }
 
@@ -113,7 +127,7 @@ public final class PlotCommand extends Command {
                     player.getUniqueId(),
                     bypass
             );
-            if (!handleOwnerResult(context, player, result)) return context.fail();
+            if (!handleOwnerResult(player, result)) return context.fail();
 
             PlotWorldConfig wc = pc.world().getConfig();
             if (plot != null && shouldRefundOnDelete(player, wc)) {
@@ -121,7 +135,7 @@ public final class PlotCommand extends Command {
                 deposit(receiver, BigDecimal.valueOf(wc.sellRefund()));
             }
 
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_DELETE_SUCCESS));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_DELETE_SUCCESS));
             return context.success();
         });
     }
@@ -141,31 +155,31 @@ public final class PlotCommand extends Command {
             );
             return switch (result) {
                 case SUCCESS -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_SUCCESS, targetId.x(), targetId.z()));
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_MERGE_SUCCESS, targetId.x(), targetId.z()));
                     yield context.success();
                 }
                 case UNCLAIMED -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
                     yield context.fail();
                 }
                 case NOT_OWNER -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
                     yield context.fail();
                 }
                 case TARGET_UNCLAIMED -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_TARGET_UNCLAIMED));
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_MERGE_TARGET_UNCLAIMED));
                     yield context.fail();
                 }
                 case NOT_SAME_OWNER -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_NOT_SAME_OWNER));
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_MERGE_NOT_SAME_OWNER));
                     yield context.fail();
                 }
                 case ALREADY_MERGED -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_ALREADY));
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_MERGE_ALREADY));
                     yield context.fail();
                 }
                 case FAILED -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_MERGE_FAILED));
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_MERGE_FAILED));
                     yield context.fail();
                 }
             };
@@ -186,26 +200,22 @@ public final class PlotCommand extends Command {
             switch (result) {
                 case SUCCESS -> {
                 }
-                case NOT_MERGED -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_NOT_MERGED));
+                case NOT_MERGED, FAILED -> {
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_UNMERGE_NOT_MERGED));
                     return context.fail();
                 }
                 case UNCLAIMED -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
                     return context.fail();
                 }
                 case NOT_OWNER -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
-                    return context.fail();
-                }
-                case FAILED -> {
-                    context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_NOT_MERGED));
+                    player.sendMessage(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
                     return context.fail();
                 }
             }
 
             PlotId targetId = pc.world().getAdjacentPlotId(pc.plotId(), dir);
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_UNMERGE_SUCCESS, targetId.x(), targetId.z()));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_UNMERGE_SUCCESS, targetId.x(), targetId.z()));
             return context.success();
         });
     }
@@ -219,7 +229,7 @@ public final class PlotCommand extends Command {
                 ownerLine = messages.renderInline(player, LangKeys.MESSAGE_CLAIMED_INFO, plot.getOwnerNameOrUUID());
             }
 
-            context.addOutput(messages.renderInline(
+            player.sendMessage(messages.renderInline(
                     player,
                     LangKeys.COMMAND_PLOT_INFO_HEADER,
                     pc.plotId().x(),
@@ -227,10 +237,10 @@ public final class PlotCommand extends Command {
                     pc.world().getConfig().worldName()
             ));
 
-            context.addOutput(ownerLine);
+            player.sendMessage(ownerLine);
 
             if (plot != null && plot.isClaimed()) {
-                context.addOutput(messages.renderInline(
+                player.sendMessage(messages.renderInline(
                         player,
                         LangKeys.COMMAND_PLOT_INFO_ACCESS,
                         String.valueOf(plot.getTrusted().size()),
@@ -240,6 +250,80 @@ public final class PlotCommand extends Command {
 
             return context.success();
         });
+    }
+
+    private CommandResult handleList(CommandContext context, EntityPlayer player) {
+        UUID ownerId = player.getUniqueId();
+        boolean found = false;
+
+        for (String worldName : config.worlds().keySet()) {
+            PlotWorld world = plotService.getPlotWorld(worldName);
+            if (world == null) continue;
+
+            for (Plot plot : world.getPlots().values()) {
+                if (!plot.isOwner(ownerId)) continue;
+
+                player.sendMessage(messages.renderInline(
+                        player,
+                        LangKeys.COMMAND_PLOT_INFO_HEADER,
+                        plot.getId().x(),
+                        plot.getId().z(),
+                        world.getConfig().worldName()
+                ));
+                found = true;
+            }
+        }
+
+        if (!found) {
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_HOME_NOT_FOUND, player.getDisplayName()));
+            return context.fail();
+        }
+
+        return context.success();
+    }
+
+    private CommandResult handleVisitPlayer(CommandContext context, EntityPlayer player) {
+        EntityPlayer target = resolveSingleTarget(context, 1);
+        if (target == null) return context.fail();
+
+        boolean same = target.getUniqueId().equals(player.getUniqueId());
+        if (!same && !hasAdminBypass(player)) {
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_NO_PERMISSION));
+            return context.fail();
+        }
+
+        return teleportHome(context, player, target.getUniqueId(), target.getDisplayName());
+    }
+
+    private CommandResult handleVisitCoords(CommandContext context, EntityPlayer player) {
+        Integer x = context.getResult(1);
+        Integer z = context.getResult(2);
+        PlotService.PlotLocation location = plotService.resolvePlot(player.getDimension(), new PlotId(x, z));
+        if (location == null) {
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_NOT_PLOT_WORLD));
+            return context.fail();
+        }
+
+        Plot plot = location.plot();
+        if (plot == null || !plot.isClaimed()) {
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+            return context.fail();
+        }
+
+        if (!plot.canEnter(player.getUniqueId()) && !hasAdminBypass(player)) {
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_ENTER_DENIED));
+            return context.fail();
+        }
+
+        teleportToPlot(player, location.world(), location.id());
+        player.sendMessage(messages.render(
+                player,
+                LangKeys.MESSAGE_HOME_TELEPORT,
+                location.id().x(),
+                location.id().z(),
+                location.world().getConfig().worldName()
+        ));
+        return context.success();
     }
 
     private CommandResult handleHomeOther(CommandContext context, EntityPlayer player) {
@@ -257,7 +341,7 @@ public final class PlotCommand extends Command {
         EntityPlayer target = targets.getFirst();
         boolean same = target.getUniqueId().equals(player.getUniqueId());
         if (!same && !hasAdminBypass(player)) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_NO_PERMISSION));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_NO_PERMISSION));
             return context.fail();
         }
 
@@ -267,9 +351,9 @@ public final class PlotCommand extends Command {
     private CommandResult handleSetHome(CommandContext context, EntityPlayer player) {
         return withPlotContext(context, player, pc -> {
             PlotService.OwnerActionResult result = plotService.setHomePlot(player.getUniqueId(), pc.world(), pc.plotId());
-            if (!handleOwnerResult(context, player, result)) return context.fail();
+            if (!handleOwnerResult(player, result)) return context.fail();
 
-            context.addOutput(messages.render(
+            player.sendMessage(messages.render(
                     player,
                     LangKeys.MESSAGE_HOME_SET,
                     pc.plotId().x(),
@@ -294,9 +378,9 @@ public final class PlotCommand extends Command {
                     target.getUniqueId(),
                     resolveOwnerName(target)
             );
-            if (!handleOwnerResult(context, player, result)) return context.fail();
+            if (!handleOwnerResult(player, result)) return context.fail();
 
-            context.addOutput(messages.render(
+            player.sendMessage(messages.render(
                     player,
                     LangKeys.MESSAGE_OWNER_SET,
                     target.getDisplayName(),
@@ -316,7 +400,7 @@ public final class PlotCommand extends Command {
                     player,
                     pt,
                     plot -> plot.withTrustedAdded(target.getUniqueId())
-                                .withDeniedRemoved(target.getUniqueId()),
+                            .withDeniedRemoved(target.getUniqueId()),
                     LangKeys.MESSAGE_TRUST_ADDED
             );
         });
@@ -343,7 +427,7 @@ public final class PlotCommand extends Command {
                     player,
                     pt,
                     plot -> plot.withDeniedAdded(target.getUniqueId())
-                                .withTrustedRemoved(target.getUniqueId()),
+                            .withTrustedRemoved(target.getUniqueId()),
                     LangKeys.MESSAGE_DENY_ADDED
             );
         });
@@ -374,14 +458,14 @@ public final class PlotCommand extends Command {
 
     private CommandResult handleFlagList(CommandContext context, EntityPlayer player) {
         return withClaimedPlotContext(context, player, pc -> {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_FLAG_LIST, renderFlags(pc.plot())));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_FLAG_LIST, renderFlags(pc.plot())));
             return context.success();
         });
     }
 
     private CommandResult handleFlagShow(CommandContext context, EntityPlayer player, PlotFlag flag) {
         return withClaimedPlotContext(context, player, pc -> {
-            context.addOutput(messages.render(
+            player.sendMessage(messages.render(
                     player,
                     LangKeys.MESSAGE_FLAG_VALUE,
                     flag.getLowerCaseName(),
@@ -401,8 +485,8 @@ public final class PlotCommand extends Command {
                         hasAdminBypass(player),
                         p -> p.withoutFlag(flag.getLowerCaseName())
                 );
-                if (!handleOwnerResult(context, player, result)) return context.fail();
-                context.addOutput(messages.render(
+                if (!handleOwnerResult(player, result)) return context.fail();
+                player.sendMessage(messages.render(
                         player,
                         LangKeys.MESSAGE_FLAG_RESET,
                         flag.getLowerCaseName(),
@@ -413,7 +497,7 @@ public final class PlotCommand extends Command {
 
             Boolean parsed = PlotFlagValue.parseBoolean(rawValue);
             if (parsed == null) {
-                context.addOutput(messages.render(player, LangKeys.MESSAGE_FLAG_INVALID_VALUE));
+                player.sendMessage(messages.render(player, LangKeys.MESSAGE_FLAG_INVALID_VALUE));
                 return context.fail();
             }
 
@@ -424,8 +508,8 @@ public final class PlotCommand extends Command {
                     hasAdminBypass(player),
                     p -> p.withFlag(flag, parsed)
             );
-            if (!handleOwnerResult(context, player, result)) return context.fail();
-            context.addOutput(messages.render(
+            if (!handleOwnerResult(player, result)) return context.fail();
+            player.sendMessage(messages.render(
                     player,
                     LangKeys.MESSAGE_FLAG_SET,
                     flag.getLowerCaseName(),
@@ -440,7 +524,7 @@ public final class PlotCommand extends Command {
             EntityPlayer player,
             Function<PlotContext, CommandResult> action
     ) {
-        PlotContext pc = resolvePlotContext(context, player);
+        PlotContext pc = resolvePlotContext(player);
         if (pc == null) return context.fail();
         return action.apply(pc);
     }
@@ -450,7 +534,7 @@ public final class PlotCommand extends Command {
             EntityPlayer player,
             Function<PlotContext, CommandResult> action
     ) {
-        PlotContext pc = resolveClaimedPlotContext(context, player);
+        PlotContext pc = resolveClaimedPlotContext(player);
         if (pc == null) return context.fail();
         return action.apply(pc);
     }
@@ -465,10 +549,10 @@ public final class PlotCommand extends Command {
         return action.apply(pt);
     }
 
-    private PlotContext resolvePlotContext(CommandContext context, EntityPlayer player) {
+    private PlotContext resolvePlotContext(EntityPlayer player) {
         PlotWorld world = plotService.getPlotWorld(player.getDimension());
         if (world == null) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_PLOT_WORLD));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_NOT_PLOT_WORLD));
             return null;
         }
 
@@ -477,27 +561,27 @@ public final class PlotCommand extends Command {
         PlotId plotId = world.getPlotIdAt(x, z);
 
         if (plotId == null) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_IN_PLOT));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_NOT_IN_PLOT));
             return null;
         }
 
         return new PlotContext(world, plotId);
     }
 
-    private PlotContext resolveClaimedPlotContext(CommandContext context, EntityPlayer player) {
-        PlotContext pc = resolvePlotContext(context, player);
+    private PlotContext resolveClaimedPlotContext(EntityPlayer player) {
+        PlotContext pc = resolvePlotContext(player);
         if (pc == null) return null;
 
         Plot plot = pc.plot();
         if (plot == null || !plot.isClaimed()) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
             return null;
         }
         return pc;
     }
 
     private PlotTarget resolvePlotTarget(CommandContext context, EntityPlayer player) {
-        PlotContext pc = resolvePlotContext(context, player);
+        PlotContext pc = resolvePlotContext(player);
         if (pc == null) return null;
 
         EntityPlayer target = resolveSingleTarget(context, 1);
@@ -532,7 +616,7 @@ public final class PlotCommand extends Command {
         boolean charged = false;
         if (shouldChargeOnClaim(player, wc)) {
             if (!withdraw(player.getUniqueId(), price)) {
-                context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_ENOUGH_MONEY, price.toPlainString()));
+                player.sendMessage(messages.render(player, LangKeys.MESSAGE_NOT_ENOUGH_MONEY, price.toPlainString()));
                 return context.fail();
             }
             charged = true;
@@ -550,22 +634,20 @@ public final class PlotCommand extends Command {
                 deposit(player.getUniqueId(), price);
             }
             switch (result) {
-                case ALREADY_CLAIMED -> context.addOutput(messages.render(player, LangKeys.MESSAGE_ALREADY_CLAIMED));
-                case TOO_MANY -> context.addOutput(messages.render(
+                case ALREADY_CLAIMED -> player.sendMessage(messages.render(player, LangKeys.MESSAGE_ALREADY_CLAIMED));
+                case TOO_MANY -> player.sendMessage(messages.render(
                         player,
                         LangKeys.MESSAGE_TOO_MANY_PLOTS,
                         String.valueOf(maxPlots)
                 ));
-                case FAILED -> context.addOutput(messages.render(player, LangKeys.MESSAGE_CLAIM_FAILED));
-                case SUCCESS -> {
-                }
+                case FAILED -> player.sendMessage(messages.render(player, LangKeys.MESSAGE_CLAIM_FAILED));
             }
             return context.fail();
         }
 
         Plot claimed = pc.world().getPlot(pc.plotId());
         if (claimed == null) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_CLAIM_FAILED));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_CLAIM_FAILED));
             return context.fail();
         }
 
@@ -575,14 +657,8 @@ public final class PlotCommand extends Command {
             teleportToPlot(player, pc.world(), pc.plotId());
         }
 
-        context.addOutput(messages.render(player, LangKeys.MESSAGE_CLAIM_SUCCESS));
+        player.sendMessage(messages.render(player, LangKeys.MESSAGE_CLAIM_SUCCESS));
         return context.success();
-    }
-
-    private static String resolveOwnerName(EntityPlayer player) {
-        return player.getController() != null
-                ? player.getController().getOriginName()
-                : player.getDisplayName();
     }
 
     private Currency resolveCurrency(Logger logger) {
@@ -622,7 +698,7 @@ public final class PlotCommand extends Command {
     private CommandResult teleportHome(CommandContext context, EntityPlayer player, UUID targetId, String targetName) {
         PlotService.PlotLocation location = plotService.findHomePlot(targetId);
         if (location == null) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_HOME_NOT_FOUND, targetName));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_HOME_NOT_FOUND, targetName));
             return context.fail();
         }
 
@@ -630,12 +706,12 @@ public final class PlotCommand extends Command {
         if (plot != null
             && !plot.canEnter(player.getUniqueId())
             && !hasAdminBypass(player)) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_ENTER_DENIED));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_ENTER_DENIED));
             return context.fail();
         }
 
         teleportToPlot(player, location.world(), location.id());
-        context.addOutput(messages.render(
+        player.sendMessage(messages.render(
                 player,
                 LangKeys.MESSAGE_HOME_TELEPORT,
                 location.id().x(),
@@ -663,12 +739,12 @@ public final class PlotCommand extends Command {
         ));
     }
 
-    private boolean handleOwnerResult(CommandContext context, EntityPlayer player, PlotService.OwnerActionResult result) {
+    private boolean handleOwnerResult(EntityPlayer player, PlotService.OwnerActionResult result) {
         if (result == PlotService.OwnerActionResult.SUCCESS) return true;
         if (result == PlotService.OwnerActionResult.UNCLAIMED) {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_PLOT_UNCLAIMED));
         } else {
-            context.addOutput(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_NOT_OWNER));
         }
         return false;
     }
@@ -698,9 +774,9 @@ public final class PlotCommand extends Command {
                 hasAdminBypass(player),
                 updater
         );
-        if (!handleOwnerResult(context, player, result)) return context.fail();
+        if (!handleOwnerResult(player, result)) return context.fail();
 
-        context.addOutput(messages.render(player, messageKey, target.target().getDisplayName()));
+        player.sendMessage(messages.render(player, messageKey, target.target().getDisplayName()));
         return context.success();
     }
 
@@ -712,7 +788,8 @@ public final class PlotCommand extends Command {
         return player.hasPermission(Permissions.ECONOMY_BYPASS).asBoolean();
     }
 
-    private record PlotTarget(PlotWorld world, PlotId plotId, EntityPlayer target) {}
+    private record PlotTarget(PlotWorld world, PlotId plotId, EntityPlayer target) {
+    }
 
     private record PlotContext(PlotWorld world, PlotId plotId) {
         Plot plot() {

@@ -60,22 +60,25 @@ Perfect for survival servers, creative building communities, and any server need
 
 ## 📜 Commands
 
-| Command                     | Description                                      | Permission           |
-|-----------------------------|--------------------------------------------------|----------------------|
-| `/plot claim`               | Claim the plot you are standing in               | `allayplots.claim`   |
-| `/plot auto`                | Find and claim the next free plot                | `allayplots.auto`    |
-| `/plot delete`              | Delete the current plot (owner only)             | `allayplots.delete`  |
-| `/plot merge [direction]`   | Merge with adjacent plot                         | `allayplots.merge`   |
-| `/plot unmerge [direction]` | Unmerge from adjacent plot                       | `allayplots.unmerge` |
-| `/plot info`                | Show current plot information                    | `allayplots.info`    |
-| `/plot home [player]`       | Teleport to your plot home (or another player's) | `allayplots.home`    |
-| `/plot sethome`             | Set plot home to current location                | `allayplots.sethome` |
+| Command                     | Description                                      | Permission                |
+|-----------------------------|--------------------------------------------------|---------------------------|
+| `/plot claim`               | Claim the plot you are standing in               | `allayplots.claim`        |
+| `/plot auto`                | Find and claim the next free plot                | `allayplots.auto`         |
+| `/plot delete`              | Delete the current plot (owner only)             | `allayplots.delete`       |
+| `/plot merge [direction]`   | Merge with adjacent plot                         | `allayplots.merge`        |
+| `/plot unmerge [direction]` | Unmerge from adjacent plot                       | `allayplots.unmerge`      |
+| `/plot info`                | Show current plot information                    | `allayplots.info`         |
+| `/plot list`                | List your plots                                  | `allayplots.command.plot` |
+| `/plot visit <player>`      | Visit another player's plot home                 | `allayplots.command.plot` |
+| `/plot visit <x> <z>`       | Visit a plot by coordinates                      | `allayplots.command.plot` |
+| `/plot home [player]`       | Teleport to your plot home (or another player's) | `allayplots.home`         |
+| `/plot sethome`             | Set plot home to current location                | `allayplots.sethome`      |
 | `/plot setowner <player>`   | Set plot owner (admin)                           | `allayplots.admin.bypass` |
-| `/plot trust <player>`      | Trust a player on your plot                      | `allayplots.trust`   |
-| `/plot untrust <player>`    | Remove a trusted player                          | `allayplots.untrust` |
-| `/plot deny <player>`       | Deny a player from your plot                     | `allayplots.deny`    |
-| `/plot undeny <player>`     | Remove a denied player                           | `allayplots.undeny`  |
-| `/plot flag [flag] [value]` | List, view, or set plot flags                    | `allayplots.flag`    |
+| `/plot trust <player>`      | Trust a player on your plot                      | `allayplots.trust`        |
+| `/plot untrust <player>`    | Remove a trusted player                          | `allayplots.untrust`      |
+| `/plot deny <player>`       | Deny a player from your plot                     | `allayplots.deny`         |
+| `/plot undeny <player>`     | Remove a denied player                           | `allayplots.undeny`       |
+| `/plot flag [flag] [value]` | List, view, or set plot flags                    | `allayplots.flag`         |
 
 **Merge Directions:** `north`, `east`, `south`, `west` (defaults to your facing direction)
 

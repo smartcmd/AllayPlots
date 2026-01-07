@@ -37,4 +37,13 @@ dependencies {
     implementation(group = "org.xerial", name = "sqlite-jdbc", version = "3.47.1.0")
     implementation(group = "com.h2database", name = "h2", version = "2.4.240")
     annotationProcessor(group = "org.projectlombok", name = "lombok", version = "1.18.34")
+
+    testImplementation(group = "org.junit.jupiter", name = "junit-jupiter", version = "5.10.0")
+    testImplementation(group = "org.assertj", name = "assertj-core", version = "3.24.2")
+    testImplementation(group = "org.slf4j", name = "slf4j-simple", version = "2.0.9")
+    testRuntimeOnly(group = "org.junit.platform", name = "junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

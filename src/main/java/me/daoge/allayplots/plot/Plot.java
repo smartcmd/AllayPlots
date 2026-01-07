@@ -76,7 +76,10 @@ public final class Plot {
     }
 
     public String getOwnerNameOrUUID() {
-        return ownerName != null ? ownerName : owner.toString();
+        if (ownerName != null) {
+            return ownerName;
+        }
+        return owner != null ? owner.toString() : "Unknown";
     }
 
     public Plot withOwnerName(String ownerName) {

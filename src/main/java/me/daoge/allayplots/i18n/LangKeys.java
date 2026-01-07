@@ -42,6 +42,7 @@ public final class LangKeys {
     public static final String MESSAGE_FLAG_SET = "allayplots:message.flag_set";
     public static final String MESSAGE_FLAG_RESET = "allayplots:message.flag_reset";
     public static final String MESSAGE_FLAG_INVALID_VALUE = "allayplots:message.flag_invalid_value";
+    public static final String MESSAGE_NO_FREE_PLOT = "allayplots:message.no_free_plot";
 
     public static final String COMMAND_PLOT_DESCRIPTION = "allayplots:command.plot.description";
     public static final String COMMAND_PLOT_HELP = "allayplots:command.plot.help";

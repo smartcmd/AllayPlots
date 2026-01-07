@@ -114,6 +114,10 @@ public final class PlotCommand extends Command {
         }
 
         PlotId nextId = plotService.findNextFreePlotId(world);
+        if (nextId == null) {
+            player.sendMessage(messages.render(player, LangKeys.MESSAGE_NO_FREE_PLOT));
+            return context.fail();
+        }
         return doClaim(context, player, new PlotContext(world, nextId));
     }
 

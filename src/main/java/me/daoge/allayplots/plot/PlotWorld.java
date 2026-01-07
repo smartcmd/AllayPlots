@@ -140,9 +140,10 @@ public final class PlotWorld {
         return count;
     }
 
+    private static final int MAX_AUTO_CLAIM_RADIUS = 10000;
+
     public PlotId findNextFreePlotId() {
-        int radius = 0;
-        while (true) {
+        for (int radius = 0; radius <= MAX_AUTO_CLAIM_RADIUS; radius++) {
             for (int x = -radius; x <= radius; x++) {
                 for (int z = -radius; z <= radius; z++) {
                     boolean onBorder = (x == radius || x == -radius) || (z == radius || z == -radius);
@@ -153,8 +154,8 @@ public final class PlotWorld {
                     if (plot == null || !plot.isClaimed()) return id;
                 }
             }
-            radius++;
         }
+        return null;
     }
 
     public PlotId getAdjacentPlotId(PlotId id, PlotMergeDirection direction) {

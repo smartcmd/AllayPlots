@@ -37,6 +37,7 @@
   "allayplots:message.flag_set": "&aFlag &e%1 &aset to &f%2&a.",
   "allayplots:message.flag_reset": "&aFlag &e%1 &areset to default (&f%2&a).",
   "allayplots:message.flag_invalid_value": "&cInvalid flag value. Use true/false, on/off, allow/deny.",
+  "allayplots:message.no_free_plot": "&cNo free plots available within search radius.",
   "allayplots:command.plot.description": "Plot management commands",
   "allayplots:command.plot.help": "&7Commands:\n&8- &e/plot claim &7Claim current plot\n&8- &e/plot auto &7Auto-claim next free plot\n&8- &e/plot delete &7Delete current plot\n&8- &e/plot merge [direction] &7Merge with adjacent plot\n&8- &e/plot unmerge [direction] &7Unmerge adjacent plot\n&8- &e/plot info &7Show current plot info\n&8- &e/plot list &7List your plots\n&8- &e/plot visit <player> &7Visit player's home plot\n&8- &e/plot visit <x> <z> &7Visit plot by coordinates\n&8- &e/plot home [player] &7Teleport to plot home\n&8- &e/plot sethome &7Set plot home\n&8- &e/plot setowner <player> &7Set plot owner (admin)\n&8- &e/plot trust <player> &7Trust a player\n&8- &e/plot untrust <player> &7Untrust a player\n&8- &e/plot deny <player> &7Deny a player\n&8- &e/plot undeny <player> &7Undeny a player\n&8- &e/plot flag [flag] [value] &7List/view/set flags",
   "allayplots:command.plot.info.header": "&6Plot &e(%1, %2) &7(&f%3&7)",

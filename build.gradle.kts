@@ -14,7 +14,7 @@ java {
 }
 
 allay {
-    api = "0.20.0-SNAPSHOT"
+    api = "0.20.0"
 
     plugin {
         entrance = ".AllayPlotsPlugin"

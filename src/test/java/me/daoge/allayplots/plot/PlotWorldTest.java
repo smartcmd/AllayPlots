@@ -221,4 +221,275 @@ class PlotWorldTest {
             assertThat(plotWorld.countOwnedPlots(owner)).isEqualTo(2);
         }
     }
+
+    @Nested
+    @DisplayName("Coordinate Calculations (getPlotIdAt)")
+    class CoordinateCalculations {
+        // Default config: plotSize=35, roadSize=7, totalSize=42
+        // Plot 0,0 covers blocks 0-34 (x and z)
+        // Road covers blocks 35-41
+        // Plot 1,0 covers blocks 42-76
+
+        @Test
+        @DisplayName("returns correct id for origin plot center")
+        void originPlotCenter() {
+            assertThat(plotWorld.getPlotIdAt(17, 17)).isEqualTo(new PlotId(0, 0));
+        }
+
+        @Test
+        @DisplayName("returns correct id for origin plot corner")
+        void originPlotCorner() {
+            assertThat(plotWorld.getPlotIdAt(0, 0)).isEqualTo(new PlotId(0, 0));
+            assertThat(plotWorld.getPlotIdAt(34, 34)).isEqualTo(new PlotId(0, 0));
+        }
+
+        @Test
+        @DisplayName("returns null for road between plots")
+        void roadBetweenPlots() {
+            // Road is at x=35-41 (between plot 0 and plot 1)
+            assertThat(plotWorld.getPlotIdAt(35, 17)).isNull();
+            assertThat(plotWorld.getPlotIdAt(40, 17)).isNull();
+        }
+
+        @Test
+        @DisplayName("returns correct id for positive plot")
+        void positivePlot() {
+            // Plot 1,0 starts at x=42
+            assertThat(plotWorld.getPlotIdAt(42, 0)).isEqualTo(new PlotId(1, 0));
+            assertThat(plotWorld.getPlotIdAt(50, 17)).isEqualTo(new PlotId(1, 0));
+        }
+
+        @Test
+        @DisplayName("returns correct id for negative plot")
+        void negativePlot() {
+            // Plot -1,0 is at x = -42 to -8 (roughly)
+            assertThat(plotWorld.getPlotIdAt(-20, 17)).isEqualTo(new PlotId(-1, 0));
+        }
+
+        @Test
+        @DisplayName("returns null for road intersection")
+        void roadIntersection() {
+            // Road intersection at x=35-41, z=35-41
+            assertThat(plotWorld.getPlotIdAt(38, 38)).isNull();
+        }
+
+        @Test
+        @DisplayName("returns correct id for far positive plot")
+        void farPositivePlot() {
+            // Plot 2,3 starts at x=84, z=126
+            assertThat(plotWorld.getPlotIdAt(100, 140)).isEqualTo(new PlotId(2, 3));
+        }
+
+        @Test
+        @DisplayName("returns correct id for far negative plot")
+        void farNegativePlot() {
+            assertThat(plotWorld.getPlotIdAt(-100, -100)).isEqualTo(new PlotId(-3, -3));
+        }
+    }
+
+    @Nested
+    @DisplayName("Plot Bounds")
+    class PlotBoundsTests {
+
+        @Test
+        @DisplayName("getPlotBounds returns correct bounds for origin")
+        void originBounds() {
+            PlotBounds bounds = plotWorld.getPlotBounds(new PlotId(0, 0));
+
+            assertThat(bounds.minX()).isEqualTo(0);
+            assertThat(bounds.maxX()).isEqualTo(34);
+            assertThat(bounds.minZ()).isEqualTo(0);
+            assertThat(bounds.maxZ()).isEqualTo(34);
+        }
+
+        @Test
+        @DisplayName("getPlotBounds returns correct bounds for positive plot")
+        void positivePlotBounds() {
+            PlotBounds bounds = plotWorld.getPlotBounds(new PlotId(1, 1));
+
+            assertThat(bounds.minX()).isEqualTo(42);
+            assertThat(bounds.maxX()).isEqualTo(76);
+            assertThat(bounds.minZ()).isEqualTo(42);
+            assertThat(bounds.maxZ()).isEqualTo(76);
+        }
+
+        @Test
+        @DisplayName("getPlotBounds returns correct bounds for negative plot")
+        void negativePlotBounds() {
+            PlotBounds bounds = plotWorld.getPlotBounds(new PlotId(-1, -1));
+
+            assertThat(bounds.minX()).isEqualTo(-42);
+            assertThat(bounds.maxX()).isEqualTo(-8);
+            assertThat(bounds.minZ()).isEqualTo(-42);
+            assertThat(bounds.maxZ()).isEqualTo(-8);
+        }
+    }
+
+    @Nested
+    @DisplayName("Merge Logic")
+    class MergeLogic {
+
+        @Test
+        @DisplayName("isMerged returns false for unclaimed plots")
+        void isMerged_unclaimed_returnsFalse() {
+            assertThat(plotWorld.isMerged(new PlotId(0, 0), PlotMergeDirection.EAST)).isFalse();
+        }
+
+        @Test
+        @DisplayName("isMerged returns false when not merged")
+        void isMerged_notMerged_returnsFalse() {
+            UUID owner = UUID.randomUUID();
+            plotWorld.claimPlot(new PlotId(0, 0), owner, "Player");
+            plotWorld.claimPlot(new PlotId(1, 0), owner, "Player");
+
+            assertThat(plotWorld.isMerged(new PlotId(0, 0), PlotMergeDirection.EAST)).isFalse();
+        }
+
+        @Test
+        @DisplayName("setMerged and isMerged work correctly")
+        void setMerged_isMerged_works() {
+            UUID owner = UUID.randomUUID();
+            plotWorld.claimPlot(new PlotId(0, 0), owner, "Player");
+            plotWorld.claimPlot(new PlotId(1, 0), owner, "Player");
+
+            plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.EAST, true);
+
+            assertThat(plotWorld.isMerged(new PlotId(0, 0), PlotMergeDirection.EAST)).isTrue();
+            assertThat(plotWorld.isMerged(new PlotId(1, 0), PlotMergeDirection.WEST)).isTrue();
+        }
+
+        @Test
+        @DisplayName("setMerged returns false for null plot")
+        void setMerged_nullPlot_returnsFalse() {
+            assertThat(plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.EAST, true)).isFalse();
+        }
+
+        @Test
+        @DisplayName("setMerged can unmerge plots")
+        void setMerged_canUnmerge() {
+            UUID owner = UUID.randomUUID();
+            plotWorld.claimPlot(new PlotId(0, 0), owner, "Player");
+            plotWorld.claimPlot(new PlotId(1, 0), owner, "Player");
+            plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.EAST, true);
+
+            plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.EAST, false);
+
+            assertThat(plotWorld.isMerged(new PlotId(0, 0), PlotMergeDirection.EAST)).isFalse();
+        }
+
+        @Test
+        @DisplayName("getMergeGroup returns single plot when not merged")
+        void getMergeGroup_notMerged_returnsSingle() {
+            plotWorld.claimPlot(new PlotId(0, 0), UUID.randomUUID(), "Player");
+
+            var group = plotWorld.getMergeGroup(new PlotId(0, 0));
+
+            assertThat(group).containsExactly(new PlotId(0, 0));
+        }
+
+        @Test
+        @DisplayName("getMergeGroup returns empty for null plot")
+        void getMergeGroup_nullPlot_returnsEmpty() {
+            var group = plotWorld.getMergeGroup(new PlotId(99, 99));
+
+            assertThat(group).isEmpty();
+        }
+
+        @Test
+        @DisplayName("getMergeGroup returns all merged plots")
+        void getMergeGroup_merged_returnsAll() {
+            UUID owner = UUID.randomUUID();
+            plotWorld.claimPlot(new PlotId(0, 0), owner, "P");
+            plotWorld.claimPlot(new PlotId(1, 0), owner, "P");
+            plotWorld.claimPlot(new PlotId(2, 0), owner, "P");
+            plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.EAST, true);
+            plotWorld.setMerged(new PlotId(1, 0), PlotMergeDirection.EAST, true);
+
+            var group = plotWorld.getMergeGroup(new PlotId(1, 0));
+
+            assertThat(group).containsExactlyInAnyOrder(
+                    new PlotId(0, 0),
+                    new PlotId(1, 0),
+                    new PlotId(2, 0)
+            );
+        }
+
+        @Test
+        @DisplayName("getMergeRoot returns smallest coordinate plot")
+        void getMergeRoot_returnsSmallest() {
+            UUID owner = UUID.randomUUID();
+            plotWorld.claimPlot(new PlotId(0, 0), owner, "P");
+            plotWorld.claimPlot(new PlotId(1, 0), owner, "P");
+            plotWorld.claimPlot(new PlotId(0, 1), owner, "P");
+            plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.EAST, true);
+            plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.SOUTH, true);
+
+            assertThat(plotWorld.getMergeRoot(new PlotId(1, 0))).isEqualTo(new PlotId(0, 0));
+            assertThat(plotWorld.getMergeRoot(new PlotId(0, 1))).isEqualTo(new PlotId(0, 0));
+        }
+
+        @Test
+        @DisplayName("getAdjacentPlotId returns correct neighbor")
+        void getAdjacentPlotId_returnsCorrectNeighbor() {
+            PlotId origin = new PlotId(5, 5);
+
+            assertThat(plotWorld.getAdjacentPlotId(origin, PlotMergeDirection.NORTH))
+                    .isEqualTo(new PlotId(5, 4));
+            assertThat(plotWorld.getAdjacentPlotId(origin, PlotMergeDirection.EAST))
+                    .isEqualTo(new PlotId(6, 5));
+            assertThat(plotWorld.getAdjacentPlotId(origin, PlotMergeDirection.SOUTH))
+                    .isEqualTo(new PlotId(5, 6));
+            assertThat(plotWorld.getAdjacentPlotId(origin, PlotMergeDirection.WEST))
+                    .isEqualTo(new PlotId(4, 5));
+        }
+
+        @Test
+        @DisplayName("clearMergedConnections removes all merge directions")
+        void clearMergedConnections_removesAll() {
+            UUID owner = UUID.randomUUID();
+            plotWorld.claimPlot(new PlotId(0, 0), owner, "P");
+            plotWorld.claimPlot(new PlotId(1, 0), owner, "P");
+            plotWorld.claimPlot(new PlotId(0, 1), owner, "P");
+            plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.EAST, true);
+            plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.SOUTH, true);
+
+            plotWorld.clearMergedConnections(new PlotId(0, 0));
+
+            assertThat(plotWorld.isMerged(new PlotId(0, 0), PlotMergeDirection.EAST)).isFalse();
+            assertThat(plotWorld.isMerged(new PlotId(0, 0), PlotMergeDirection.SOUTH)).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("Merged Plot Bounds")
+    class MergedPlotBounds {
+
+        @Test
+        @DisplayName("getMergedPlotBounds returns single plot bounds when not merged")
+        void notMerged_returnsSingleBounds() {
+            plotWorld.claimPlot(new PlotId(0, 0), UUID.randomUUID(), "P");
+
+            PlotBounds bounds = plotWorld.getMergedPlotBounds(new PlotId(0, 0));
+            PlotBounds single = plotWorld.getPlotBounds(new PlotId(0, 0));
+
+            assertThat(bounds).isEqualTo(single);
+        }
+
+        @Test
+        @DisplayName("getMergedPlotBounds expands for merged plots")
+        void merged_expandsBounds() {
+            UUID owner = UUID.randomUUID();
+            plotWorld.claimPlot(new PlotId(0, 0), owner, "P");
+            plotWorld.claimPlot(new PlotId(1, 0), owner, "P");
+            plotWorld.setMerged(new PlotId(0, 0), PlotMergeDirection.EAST, true);
+
+            PlotBounds bounds = plotWorld.getMergedPlotBounds(new PlotId(0, 0));
+
+            // Should span from plot 0,0 to plot 1,0
+            assertThat(bounds.minX()).isEqualTo(0);
+            assertThat(bounds.maxX()).isEqualTo(76); // Plot 1,0 maxX
+            assertThat(bounds.minZ()).isEqualTo(0);
+            assertThat(bounds.maxZ()).isEqualTo(34);
+        }
+    }
 }

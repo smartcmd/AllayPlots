@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
@@ -380,6 +381,165 @@ public abstract class AbstractDatabasePlotStorage implements PlotStorage {
                 }
             }
             stmt.executeBatch();
+        }
+    }
+
+    @Override
+    public boolean supportsIncrementalSave() {
+        return true;
+    }
+
+    @Override
+    public void saveIncremental(
+            Map<String, Map<PlotId, Plot>> dirtyPlots,
+            Map<String, Set<PlotId>> deletedPlots
+    ) {
+        if (dirtyPlots.isEmpty() && deletedPlots.isEmpty()) {
+            return;
+        }
+        try (Connection connection = openConnection()) {
+            initSchema(connection);
+            connection.setAutoCommit(false);
+            try {
+                // Delete removed plots
+                for (Map.Entry<String, Set<PlotId>> entry : deletedPlots.entrySet()) {
+                    String worldName = entry.getKey();
+                    for (PlotId id : entry.getValue()) {
+                        deletePlotData(connection, worldName, id);
+                    }
+                }
+                // Upsert dirty plots
+                for (Map.Entry<String, Map<PlotId, Plot>> entry : dirtyPlots.entrySet()) {
+                    String worldName = entry.getKey();
+                    for (Plot plot : entry.getValue().values()) {
+                        if (plot.isDefault()) {
+                            deletePlotData(connection, worldName, plot.getId());
+                        } else {
+                            upsertPlot(connection, worldName, plot);
+                        }
+                    }
+                }
+                connection.commit();
+            } catch (SQLException ex) {
+                connection.rollback();
+                logger.error("Failed to incrementally save plot data to {} storage.", getDatabaseName(), ex);
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException ex) {
+            logger.error("Failed to open {} storage connection.", getDatabaseName(), ex);
+        }
+    }
+
+    private void deletePlotData(Connection connection, String worldName, PlotId id) throws SQLException {
+        int x = id.x();
+        int z = id.z();
+        deleteFrom(connection, "plot_flags", worldName, x, z);
+        deleteFrom(connection, "plot_merged", worldName, x, z);
+        deleteFrom(connection, "plot_denied", worldName, x, z);
+        deleteFrom(connection, "plot_trusted", worldName, x, z);
+        deleteFrom(connection, "plots", worldName, x, z);
+    }
+
+    private void deleteFrom(Connection connection, String table, String worldName, int x, int z) throws SQLException {
+        String sql = "DELETE FROM " + table + " WHERE world_name = ? AND plot_x = ? AND plot_z = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, worldName);
+            stmt.setInt(2, x);
+            stmt.setInt(3, z);
+            stmt.executeUpdate();
+        }
+    }
+
+    private void upsertPlot(Connection connection, String worldName, Plot plot) throws SQLException {
+        int x = plot.getId().x();
+        int z = plot.getId().z();
+
+        // Delete existing data for this plot first, then insert fresh
+        deletePlotData(connection, worldName, plot.getId());
+
+        // Insert main plot record
+        String sql = "INSERT INTO plots (world_name, plot_x, plot_z, owner, owner_name, home) VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, worldName);
+            stmt.setInt(2, x);
+            stmt.setInt(3, z);
+            if (plot.getOwner() != null) {
+                stmt.setString(4, plot.getOwner().toString());
+            } else {
+                stmt.setNull(4, Types.VARCHAR);
+            }
+            String ownerName = plot.getOwnerName();
+            if (ownerName != null && !ownerName.isBlank()) {
+                stmt.setString(5, ownerName);
+            } else {
+                stmt.setNull(5, Types.VARCHAR);
+            }
+            stmt.setInt(6, plot.isHome() ? 1 : 0);
+            stmt.executeUpdate();
+        }
+
+        // Insert trusted
+        if (!plot.getTrusted().isEmpty()) {
+            String trustedSql = "INSERT INTO plot_trusted (world_name, plot_x, plot_z, player_uuid) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement stmt = connection.prepareStatement(trustedSql)) {
+                for (UUID uuid : plot.getTrusted()) {
+                    stmt.setString(1, worldName);
+                    stmt.setInt(2, x);
+                    stmt.setInt(3, z);
+                    stmt.setString(4, uuid.toString());
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+        }
+
+        // Insert denied
+        if (!plot.getDenied().isEmpty()) {
+            String deniedSql = "INSERT INTO plot_denied (world_name, plot_x, plot_z, player_uuid) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement stmt = connection.prepareStatement(deniedSql)) {
+                for (UUID uuid : plot.getDenied()) {
+                    stmt.setString(1, worldName);
+                    stmt.setInt(2, x);
+                    stmt.setInt(3, z);
+                    stmt.setString(4, uuid.toString());
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+        }
+
+        // Insert flags
+        if (!plot.getFlags().isEmpty()) {
+            String flagsSql = "INSERT INTO plot_flags (world_name, plot_x, plot_z, flag_key, flag_value) VALUES (?, ?, ?, ?, ?)";
+            try (PreparedStatement stmt = connection.prepareStatement(flagsSql)) {
+                for (Map.Entry<String, String> flagEntry : plot.getFlags().entrySet()) {
+                    String value = flagEntry.getValue();
+                    if (value == null || value.isBlank()) continue;
+                    stmt.setString(1, worldName);
+                    stmt.setInt(2, x);
+                    stmt.setInt(3, z);
+                    stmt.setString(4, flagEntry.getKey());
+                    stmt.setString(5, value);
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+        }
+
+        // Insert merged directions
+        if (!plot.getMergedDirections().isEmpty()) {
+            String mergedSql = "INSERT INTO plot_merged (world_name, plot_x, plot_z, direction) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement stmt = connection.prepareStatement(mergedSql)) {
+                for (PlotMergeDirection direction : plot.getMergedDirections()) {
+                    stmt.setString(1, worldName);
+                    stmt.setInt(2, x);
+                    stmt.setInt(3, z);
+                    stmt.setString(4, direction.getLowerCaseName());
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
         }
     }
 }

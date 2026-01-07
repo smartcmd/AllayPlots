@@ -10,6 +10,9 @@ public final class PlotWorld {
     private final Map<PlotId, Plot> plots = new ConcurrentHashMap<>();
     private final Map<PlotId, Plot> plotsView = Collections.unmodifiableMap(plots);
 
+    private final Set<PlotId> dirtyPlots = new HashSet<>();
+    private final Set<PlotId> deletedPlots = new HashSet<>();
+
     public PlotWorld(PlotWorldConfig config) {
         this.config = config;
     }
@@ -28,10 +31,38 @@ public final class PlotWorld {
 
     void putPlot(PlotId id, Plot plot) {
         if (plot == null) {
-            plots.remove(id);
+            removePlot(id);
             return;
         }
         plots.put(id, plot);
+        markDirty(id);
+    }
+
+    private void markDirty(PlotId id) {
+        deletedPlots.remove(id);
+        dirtyPlots.add(id);
+    }
+
+    private void markDeleted(PlotId id) {
+        dirtyPlots.remove(id);
+        deletedPlots.add(id);
+    }
+
+    public Set<PlotId> getDirtyPlots() {
+        return Collections.unmodifiableSet(dirtyPlots);
+    }
+
+    public Set<PlotId> getDeletedPlots() {
+        return Collections.unmodifiableSet(deletedPlots);
+    }
+
+    public boolean hasChanges() {
+        return !dirtyPlots.isEmpty() || !deletedPlots.isEmpty();
+    }
+
+    public void clearChanges() {
+        dirtyPlots.clear();
+        deletedPlots.clear();
     }
 
     /**
@@ -122,14 +153,18 @@ public final class PlotWorld {
     }
 
     public Plot claimPlot(PlotId id, UUID owner, String ownerName) {
-        return plots.compute(id, (key, existing) -> {
+        Plot result = plots.compute(id, (key, existing) -> {
             Plot base = existing == null ? new Plot(config.worldName(), key) : existing;
             return base.withOwner(owner, ownerName);
         });
+        markDirty(id);
+        return result;
     }
 
     public void removePlot(PlotId id) {
-        plots.remove(id);
+        if (plots.remove(id) != null) {
+            markDeleted(id);
+        }
     }
 
     public int countOwnedPlots(UUID owner) {
@@ -190,6 +225,8 @@ public final class PlotWorld {
         }
         plots.put(id, plot);
         plots.put(neighborId, neighbor);
+        markDirty(id);
+        markDirty(neighborId);
         return true;
     }
 
@@ -203,6 +240,7 @@ public final class PlotWorld {
                 Plot updated = neighbor.withMergedDirectionRemoved(dir.opposite());
                 if (updated != neighbor) {
                     plots.put(neighborId, updated);
+                    markDirty(neighborId);
                     changed = true;
                 }
             }
@@ -216,6 +254,9 @@ public final class PlotWorld {
         }
         if (plot != null) {
             plots.put(id, plot);
+            if (changed) {
+                markDirty(id);
+            }
         }
         return changed;
     }
@@ -283,6 +324,7 @@ public final class PlotWorld {
                         Plot updatedNeighbor = neighbor.withMergedDirectionRemoved(dir.opposite());
                         if (updatedNeighbor != neighbor) {
                             plots.put(neighborId, updatedNeighbor);
+                            markDirty(neighborId);
                             changed = true;
                         }
                     }
@@ -295,6 +337,7 @@ public final class PlotWorld {
             }
             if (updated != plot) {
                 plots.put(id, updated);
+                markDirty(id);
                 changed = true;
             }
         }

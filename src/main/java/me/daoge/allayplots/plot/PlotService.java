@@ -36,14 +36,26 @@ public final class PlotService {
     private final Map<UUID, PlotLocation> homeByOwner = new ConcurrentHashMap<>();
     private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private boolean dirty = false;
     private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor(
             Thread.ofVirtual().name("AllayPlots-PlotSave", 0).factory());
     private final AtomicBoolean saveInFlight = new AtomicBoolean(false);
-    private final AtomicReference<Map<String, Map<PlotId, Plot>>> pendingSave = new AtomicReference<>();
+    private final AtomicReference<PlotChanges> pendingSave = new AtomicReference<>();
     private final Object saveLock = new Object();
     private Thread serviceThread;
     private static final Runnable POISON_PILL = () -> {};
+
+    /**
+     * Holds incremental changes for saving.
+     */
+    private record PlotChanges(
+            Map<String, Map<PlotId, Plot>> dirtyPlots,
+            Map<String, Set<PlotId>> deletedPlots,
+            Map<String, Map<PlotId, Plot>> fullSnapshot
+    ) {
+        boolean isEmpty() {
+            return dirtyPlots.isEmpty() && deletedPlots.isEmpty();
+        }
+    }
 
     public PlotService(PluginConfig config, PlotStorage storage, Logger logger) {
         this.config = config;
@@ -126,16 +138,56 @@ public final class PlotService {
     }
 
     private void markDirty() {
-        dirty = true;
+        // No-op: changes are now tracked per-PlotWorld
     }
 
-    private Map<String, Map<PlotId, Plot>> snapshotIfDirty() {
-        if (!dirty) {
+    private PlotChanges collectChanges() {
+        Map<String, Map<PlotId, Plot>> dirtyPlots = new HashMap<>();
+        Map<String, Set<PlotId>> deletedPlots = new HashMap<>();
+        Map<String, Map<PlotId, Plot>> fullSnapshot = null;
+
+        boolean hasChanges = false;
+        for (Map.Entry<String, PlotWorld> entry : worlds.entrySet()) {
+            PlotWorld world = entry.getValue();
+            if (world.hasChanges()) {
+                hasChanges = true;
+                String worldName = entry.getKey();
+
+                // Collect dirty plots
+                Set<PlotId> dirty = world.getDirtyPlots();
+                if (!dirty.isEmpty()) {
+                    Map<PlotId, Plot> worldDirty = new HashMap<>();
+                    for (PlotId id : dirty) {
+                        Plot plot = world.getPlot(id);
+                        if (plot != null) {
+                            worldDirty.put(id, plot);
+                        }
+                    }
+                    if (!worldDirty.isEmpty()) {
+                        dirtyPlots.put(worldName, worldDirty);
+                    }
+                }
+
+                // Collect deleted plots
+                Set<PlotId> deleted = world.getDeletedPlots();
+                if (!deleted.isEmpty()) {
+                    deletedPlots.put(worldName, new HashSet<>(deleted));
+                }
+
+                world.clearChanges();
+            }
+        }
+
+        if (!hasChanges) {
             return null;
         }
-        Map<String, Map<PlotId, Plot>> snapshot = snapshotPlots();
-        dirty = false;
-        return snapshot;
+
+        // Create full snapshot for non-incremental storage backends
+        if (!storage.supportsIncrementalSave()) {
+            fullSnapshot = snapshotPlots();
+        }
+
+        return new PlotChanges(dirtyPlots, deletedPlots, fullSnapshot);
     }
 
     private <T> T runOnPlotThread(Callable<T> action) {
@@ -218,20 +270,20 @@ public final class PlotService {
     }
 
     public void save() {
-        Map<String, Map<PlotId, Plot>> snapshot = runOnPlotThread(this::snapshotIfDirty);
-        if (snapshot == null) {
+        PlotChanges changes = runOnPlotThread(this::collectChanges);
+        if (changes == null) {
             return;
         }
-        saveBlocking(snapshot);
+        saveBlocking(changes);
     }
 
     public void requestSave() {
         submitAsync(() -> {
-            Map<String, Map<PlotId, Plot>> snapshot = snapshotIfDirty();
-            if (snapshot == null) {
+            PlotChanges changes = collectChanges();
+            if (changes == null) {
                 return;
             }
-            enqueueSave(snapshot);
+            enqueueSave(changes);
         });
     }
 
@@ -507,8 +559,8 @@ public final class PlotService {
         return true;
     }
 
-    private void enqueueSave(Map<String, Map<PlotId, Plot>> snapshot) {
-        pendingSave.set(snapshot);
+    private void enqueueSave(PlotChanges changes) {
+        pendingSave.set(changes);
         if (saveInFlight.compareAndSet(false, true)) {
             saveExecutor.execute(this::runSaveLoop);
         }
@@ -517,12 +569,12 @@ public final class PlotService {
     private void runSaveLoop() {
         try {
             while (true) {
-                Map<String, Map<PlotId, Plot>> snapshot = pendingSave.getAndSet(null);
-                if (snapshot == null) {
+                PlotChanges changes = pendingSave.getAndSet(null);
+                if (changes == null) {
                     break;
                 }
                 try {
-                    saveBlocking(snapshot);
+                    saveBlocking(changes);
                 } catch (Throwable ex) {
                     logger.error("Failed to save plot data.", ex);
                 }
@@ -535,9 +587,14 @@ public final class PlotService {
         }
     }
 
-    private void saveBlocking(Map<String, Map<PlotId, Plot>> snapshot) {
+    private void saveBlocking(PlotChanges changes) {
         synchronized (saveLock) {
-            storage.save(snapshot);
+            if (storage.supportsIncrementalSave()) {
+                storage.saveIncremental(changes.dirtyPlots(), changes.deletedPlots());
+            } else {
+                // Fall back to full save for non-incremental storage (e.g., YAML)
+                storage.save(changes.fullSnapshot());
+            }
         }
     }
 

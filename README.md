@@ -44,11 +44,11 @@ Perfect for survival servers, creative building communities, and any server need
 
 ## 📦 Dependencies
 
-| Dependency                                                  | Version         | Required |
-|-------------------------------------------------------------|-----------------|----------|
-| [AllayMC](https://github.com/AllayMC/Allay)                 | 0.20.0-SNAPSHOT | ✅ Yes    |
-| [EconomyAPI](https://github.com/AllayMC/EconomyAPI)         | Latest          | ✅ Yes    |
-| [PlaceholderAPI](https://github.com/AllayMC/PlaceholderAPI) | Latest          | ✅ Yes    |
+| Dependency                                                  | Version | Required |
+|-------------------------------------------------------------|---------|----------|
+| [AllayMC](https://github.com/AllayMC/Allay)                 | 0.20.0  | ✅ Yes    |
+| [EconomyAPI](https://github.com/AllayMC/EconomyAPI)         | Latest  | ✅ Yes    |
+| [PlaceholderAPI](https://github.com/AllayMC/PlaceholderAPI) | Latest  | ✅ Yes    |
 
 ## 🚀 Installation
 
